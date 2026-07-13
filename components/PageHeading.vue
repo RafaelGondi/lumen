@@ -54,7 +54,29 @@ defineProps<{
 
 .page-heading__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-3);
+}
+
+@media (max-width: 768px) {
+  .page-heading {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-4);
+  }
+
+  .page-heading h1 {
+    font-size: var(--text-xl);
+  }
+
+  .page-heading__actions {
+    justify-content: stretch;
+  }
+
+  .page-heading__actions > :deep(*) {
+    flex: 1 1 auto;
+  }
 }
 </style>

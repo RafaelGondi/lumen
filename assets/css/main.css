@@ -5,7 +5,6 @@
 }
 
 html {
-  min-width: 1024px;
   background: var(--color-canvas);
   color: var(--color-ink);
   font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;

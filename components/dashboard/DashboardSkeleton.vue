@@ -22,6 +22,29 @@
       </UiCard>
     </div>
 
+    <div class="dashboard-skeleton__carousel" aria-hidden="true">
+      <UiCard padding="md">
+        <div class="dashboard-skeleton__line">
+          <UiSkeleton width="44%" />
+          <UiSkeleton width="2rem" height="2rem" radius="sm" />
+        </div>
+        <UiSkeleton
+          width="72%"
+          height="2rem"
+          radius="sm"
+          class="dashboard-skeleton__value"
+        />
+        <UiSkeleton width="40%" height="0.75rem" />
+        <div class="dashboard-skeleton__details">
+          <UiSkeleton width="38%" height="2.25rem" />
+          <UiSkeleton width="42%" height="2.25rem" />
+        </div>
+      </UiCard>
+      <div class="dashboard-skeleton__dots">
+        <span /><span /><span /><span />
+      </div>
+    </div>
+
     <div class="dashboard-skeleton__lists">
       <UiCard v-for="index in 2" :key="index" padding="none">
         <div class="dashboard-skeleton__list-header">
@@ -51,6 +74,10 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-4);
+}
+
+.dashboard-skeleton__carousel {
+  display: none;
 }
 
 .dashboard-skeleton__stats :deep(.ui-card) {
@@ -103,5 +130,42 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+@media (max-width: 900px) {
+  .dashboard-skeleton__stats {
+    display: none;
+  }
+
+  .dashboard-skeleton__carousel {
+    display: block;
+  }
+
+  .dashboard-skeleton__carousel :deep(.ui-card) {
+    min-height: 0;
+  }
+
+  .dashboard-skeleton__dots {
+    display: flex;
+    margin-top: var(--space-3);
+    justify-content: center;
+    gap: 0.4rem;
+  }
+
+  .dashboard-skeleton__dots span {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: var(--color-border-strong);
+  }
+
+  .dashboard-skeleton__dots span:first-child {
+    width: 1.1rem;
+    background: var(--color-brand);
+  }
+
+  .dashboard-skeleton__lists {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

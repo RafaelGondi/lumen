@@ -245,6 +245,12 @@ const available = computed(() =>
   opacity: 1;
 }
 
+@media (hover: none), (max-width: 768px) {
+  .credit-card__actions {
+    opacity: 1;
+  }
+}
+
 .credit-card__actions button {
   display: grid;
   width: 1.75rem;

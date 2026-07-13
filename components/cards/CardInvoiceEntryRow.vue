@@ -207,6 +207,30 @@ defineEmits<{
   opacity: 1;
 }
 
+@media (hover: none), (max-width: 768px) {
+  .card-entry__actions {
+    opacity: 1;
+  }
+
+  .card-entry {
+    flex-wrap: wrap;
+  }
+
+  .card-entry__amount {
+    width: 100%;
+    padding-left: calc(2.25rem + var(--space-3));
+    order: 3;
+  }
+
+  .card-entry__actions {
+    margin-left: auto;
+  }
+
+  .card-entry--compact .card-entry__amount {
+    padding-left: 0;
+  }
+}
+
 .card-entry__actions button {
   display: grid;
   width: 1.75rem;

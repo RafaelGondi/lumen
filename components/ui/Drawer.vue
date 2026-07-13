@@ -160,4 +160,10 @@ onBeforeUnmount(() => {
 .drawer-leave-to .ui-drawer__panel {
   transform: translateX(100%);
 }
+
+@media (max-width: 480px) {
+  .ui-drawer__panel {
+    width: 100vw;
+  }
+}
 </style>

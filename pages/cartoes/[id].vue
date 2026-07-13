@@ -1290,5 +1290,21 @@ async function onPaymentSaved() {
   .card-entry-group__body :deep(.card-entry--compact) {
     padding-left: var(--space-5);
   }
+
+  .card-month-nav {
+    width: 100%;
+  }
+
+  .card-month-nav :deep(.month-switcher) {
+    width: 100%;
+  }
+
+  .card-entry-group__header {
+    gap: var(--space-2);
+  }
+
+  .card-entry-group__total {
+    font-size: var(--text-sm);
+  }
 }
 </style>

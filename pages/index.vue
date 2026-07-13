@@ -55,20 +55,12 @@ const {
       <DashboardSkeleton v-if="isLoading || !selectedMonth" />
 
       <div v-else :key="selectedMonth.key" class="dashboard-content">
-        <div class="stats-grid">
-          <UiStatCard :stat="selectedMonth.stats.previousBalance">
-            <template #icon><Landmark /></template>
-          </UiStatCard>
-          <UiStatCard :stat="selectedMonth.stats.revenues">
-            <template #icon><TrendingUp /></template>
-          </UiStatCard>
-          <UiStatCard :stat="selectedMonth.stats.expenses">
-            <template #icon><TrendingDown /></template>
-          </UiStatCard>
-          <UiStatCard :stat="selectedMonth.stats.currentBalance">
-            <template #icon><WalletCards /></template>
-          </UiStatCard>
-        </div>
+        <DashboardStatsCarousel
+          :previous-balance="selectedMonth.stats.previousBalance"
+          :revenues="selectedMonth.stats.revenues"
+          :expenses="selectedMonth.stats.expenses"
+          :current-balance="selectedMonth.stats.currentBalance"
+        />
 
         <div class="lists-grid">
           <DashboardFinanceListSection
@@ -130,12 +122,6 @@ const {
   background: var(--color-positive);
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-4);
-}
-
 .lists-grid {
   display: grid;
   margin-top: var(--space-5);
@@ -156,6 +142,18 @@ const {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (max-width: 900px) {
+  .lists-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .overview__heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
   }
 }
 </style>

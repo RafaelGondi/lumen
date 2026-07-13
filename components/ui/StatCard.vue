@@ -161,4 +161,10 @@ const { formatCurrency } = useCurrency()
 .stat-card--featured .stat-card__detail--positive {
   color: #7fd6ac !important;
 }
+
+@media (max-width: 480px) {
+  .stat-card {
+    min-height: 0;
+  }
+}
 </style>

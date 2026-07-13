@@ -880,4 +880,55 @@ function entryMeta(entry: EntryOccurrence) {
 .entry-row--settled .entry-row__amount {
   opacity: 0.72;
 }
+
+@media (max-width: 768px) {
+  .account-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    min-height: 0;
+    gap: var(--space-4);
+  }
+
+  .account-month__nav {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .account-month__stats {
+    grid-template-columns: 1fr;
+  }
+
+  .entry-row {
+    grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+    grid-template-areas:
+      "icon main actions"
+      "icon amount amount"
+      "icon status status";
+    row-gap: var(--space-1);
+    align-items: start;
+  }
+
+  .entry-row__icon {
+    grid-area: icon;
+    padding-top: 0.15rem;
+  }
+
+  .entry-row__main {
+    grid-area: main;
+  }
+
+  .entry-row__status {
+    grid-area: status;
+    justify-content: flex-start;
+  }
+
+  .entry-row__amount {
+    grid-area: amount;
+    justify-content: flex-start;
+  }
+
+  .entry-row__actions {
+    grid-area: actions;
+  }
+}
 </style>

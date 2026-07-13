@@ -146,6 +146,12 @@ defineEmits<{
   opacity: 1;
 }
 
+@media (hover: none), (max-width: 768px) {
+  .account-card__actions {
+    opacity: 1;
+  }
+}
+
 .account-card__actions button {
   display: grid;
   width: 1.75rem;

@@ -133,4 +133,21 @@ async function removeAccount(account: Account) {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-4);
 }
+
+@media (max-width: 900px) {
+  .accounts-summary {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .accounts-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .accounts-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

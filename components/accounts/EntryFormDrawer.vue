@@ -1111,4 +1111,11 @@ async function save() {
   opacity: 0.7;
   cursor: not-allowed;
 }
+
+@media (max-width: 480px) {
+  .entry-form__recurrence,
+  .entry-form__row {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

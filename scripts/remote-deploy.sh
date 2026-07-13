@@ -41,6 +41,7 @@ rm -rf "$APP_DIR/.output/server/node_modules/better-sqlite3"
 cp -a /tmp/lumen-native/node_modules/better-sqlite3 "$APP_DIR/.output/server/node_modules/"
 
 if [ -f "$APP_DIR/$DB_PACKAGE" ]; then
+  echo "Aplicando pacote de banco (somente quando enviado explicitamente)..."
   # Para o app antes de trocar o SQLite para não deixar -wal/-shm órfãos.
   pm2 stop financas >/dev/null 2>&1 || true
   if [ -f "$APP_DIR/.data/lumen.sqlite3" ]; then
@@ -52,8 +53,11 @@ if [ -f "$APP_DIR/$DB_PACKAGE" ]; then
     "$APP_DIR/.data/lumen.sqlite3-shm"
   tar -xzf "$APP_DIR/$DB_PACKAGE" -C "$APP_DIR/.data"
   rm -f "$APP_DIR/$DB_PACKAGE"
+else
+  echo "Nenhum pacote de banco enviado — SQLite de producao preservado."
 fi
 
+# Deploy de app nunca cria o banco; ele precisa ja existir em producao.
 test -f "$APP_DIR/.data/lumen.sqlite3"
 
 cd "$APP_DIR"

@@ -382,4 +382,18 @@ function openItem(item: FinanceListItem) {
 .finance-list__total-value--incomes {
   color: var(--color-positive-ink);
 }
+
+@media (max-width: 480px) {
+  .finance-list__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+    min-height: 0;
+    padding: var(--space-4);
+  }
+
+  .finance-list__row {
+    padding: 0.65rem var(--space-4);
+  }
+}
 </style>

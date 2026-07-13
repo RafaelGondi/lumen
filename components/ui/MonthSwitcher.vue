@@ -122,4 +122,30 @@ button svg,
   font-weight: var(--weight-semibold);
   letter-spacing: 0.01em;
 }
+
+@media (max-width: 480px) {
+  .month-switcher {
+    width: 100%;
+    grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem 3.25rem;
+  }
+
+  .month-switcher__label {
+    padding: 0 var(--space-2);
+    min-width: 0;
+  }
+
+  .month-switcher__label span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .month-switcher__label svg {
+    display: none;
+  }
+
+  .month-switcher__today {
+    padding: 0 var(--space-2);
+  }
+}
 </style>

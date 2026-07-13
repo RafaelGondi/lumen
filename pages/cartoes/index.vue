@@ -295,4 +295,10 @@ async function removeCard(card: Card) {
     text-align: left;
   }
 }
+
+@media (max-width: 560px) {
+  .cards-summary__stats {
+    gap: var(--space-3);
+  }
+}
 </style>
