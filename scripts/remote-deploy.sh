@@ -41,9 +41,15 @@ rm -rf "$APP_DIR/.output/server/node_modules/better-sqlite3"
 cp -a /tmp/lumen-native/node_modules/better-sqlite3 "$APP_DIR/.output/server/node_modules/"
 
 if [ -f "$APP_DIR/$DB_PACKAGE" ]; then
+  # Para o app antes de trocar o SQLite para não deixar -wal/-shm órfãos.
+  pm2 stop financas >/dev/null 2>&1 || true
   if [ -f "$APP_DIR/.data/lumen.sqlite3" ]; then
-    cp "$APP_DIR/.data/lumen.sqlite3" "$APP_DIR/backups/lumen-$STAMP.sqlite3"
+    cp "$APP_DIR/.data/lumen.sqlite3" "$APP_DIR/backups/lumen-$STAMP.sqlite3" || true
   fi
+  rm -f \
+    "$APP_DIR/.data/lumen.sqlite3" \
+    "$APP_DIR/.data/lumen.sqlite3-wal" \
+    "$APP_DIR/.data/lumen.sqlite3-shm"
   tar -xzf "$APP_DIR/$DB_PACKAGE" -C "$APP_DIR/.data"
   rm -f "$APP_DIR/$DB_PACKAGE"
 fi
