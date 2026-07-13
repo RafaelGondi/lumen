@@ -160,28 +160,39 @@ export default defineEventHandler(async (event) => {
       : null
 
     if (body.scope === 'series' || occurrence.occurrenceIndex === 1) {
+      const installmentCount =
+        parent.recurrence === 'installment'
+          ? (body.installmentCount ?? parent.installmentCount)
+          : parent.installmentCount
+      // Só a 1ª parcela pode reposicionar o início da série pela data do form.
+      const seriesAnchor =
+        occurrence.occurrenceIndex === 1
+          ? seriesStartDate
+          : parent.useMonthEnd
+            ? monthEndLocal(parent.date)
+            : parent.date
       const endDate =
         parent.recurrence === 'installment'
           ? addMonthsScheduled(
-              seriesStartDate,
-              (parent.installmentCount ?? 1) - 1,
+              seriesAnchor,
+              (installmentCount ?? 1) - 1,
               Boolean(parent.useMonthEnd),
             )
           : originalSpan === null
             ? null
             : addMonthsScheduled(
-                seriesStartDate,
+                seriesAnchor,
                 originalSpan,
                 Boolean(parent.useMonthEnd),
               )
 
       updateParent.run({
         ...values,
-        date: seriesStartDate,
+        date: seriesAnchor,
         id: expenseId,
         cardId,
         endDate,
-        installmentCount: parent.installmentCount,
+        installmentCount,
       })
       db.prepare(
         'DELETE FROM entry_occurrence_exceptions WHERE entry_id = ?',

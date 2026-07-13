@@ -14,6 +14,12 @@ import {
 import type { Account } from '~/types/account'
 import type { EntryOccurrence, EntrySeriesScope } from '~/types/entry'
 import { formatDateBr, roundMoney } from '~/utils/dateMoney'
+import {
+  defaultSortDir,
+  entrySortOptions,
+  sortEntries,
+  type EntrySortKey,
+} from '~/utils/sortEntries'
 
 type EntryFilter = 'all' | 'income' | 'expense'
 
@@ -70,8 +76,12 @@ const {
 
 const drawerOpen = ref(false)
 const editingEntry = ref<EntryOccurrence | null>(null)
+const deleteDialogOpen = ref(false)
+const pendingDeleteEntry = ref<EntryOccurrence | null>(null)
 const filter = ref<EntryFilter>('all')
 const searchQuery = ref('')
+const sortBy = ref<EntrySortKey>('date')
+const sortDir = ref<'asc' | 'desc'>(defaultSortDir('date'))
 
 const filterOptions = [
   { value: 'all' as const, label: 'Todos' },
@@ -100,7 +110,7 @@ const monthSummary = computed(() => {
 const filteredEntries = computed(() => {
   const term = searchQuery.value.trim().toLowerCase()
 
-  return monthEntries.value.filter((entry) => {
+  const filtered = monthEntries.value.filter((entry) => {
     if (filter.value === 'income' && !isIncoming(entry)) return false
     if (filter.value === 'expense' && !isOutgoing(entry)) return false
 
@@ -121,6 +131,12 @@ const filteredEntries = computed(() => {
       String(entry.amount).includes(term.replace(',', '.'))
     )
   })
+
+  return sortEntries(filtered, sortBy.value, sortDir.value)
+})
+
+watch(sortBy, (key) => {
+  sortDir.value = defaultSortDir(key)
 })
 
 const heroStyle = computed(() => {
@@ -169,28 +185,38 @@ watch(drawerOpen, (value) => {
   if (!value) editingEntry.value = null
 })
 
-function chooseScope(action: 'excluir'): EntrySeriesScope | null {
-  const answer = window.prompt(
-    `Excluir: digite 1 para só esta ocorrência, 2 para esta e as próximas, ou 3 para a série inteira.`,
-    '1',
-  )
-  if (answer === '1') return 'occurrence'
-  if (answer === '2') return 'future'
-  if (answer === '3') return 'series'
-  return null
+function removeEntry(entry: EntryOccurrence) {
+  pendingDeleteEntry.value = entry
+  deleteDialogOpen.value = true
 }
 
-async function removeEntry(entry: EntryOccurrence) {
-  const scope =
-    entry.recurrence === 'single' ? 'series' : chooseScope('excluir')
-  if (!scope) return
-  if (!window.confirm(`Excluir o lançamento "${entry.description}"?`)) return
+async function confirmDeleteEntry(scope: EntrySeriesScope) {
+  const entry = pendingDeleteEntry.value
+  pendingDeleteEntry.value = null
+  if (!entry) return
   await $fetch(
     `/api/entries/${entry.id}?scope=${scope}&occurrenceMonth=${entry.occurrenceMonth}`,
     { method: 'DELETE' },
   )
   await refreshAll()
 }
+
+function cancelDeleteEntry() {
+  pendingDeleteEntry.value = null
+}
+
+const deleteDialogDescription = computed(() => {
+  const entry = pendingDeleteEntry.value
+  if (!entry) return 'Escolha o alcance da exclusão.'
+  if (entry.recurrence === 'single') {
+    return `Excluir "${entry.description}"?`
+  }
+  return `Excluir "${entry.description}". Escolha o alcance:`
+})
+
+const deleteShowsScope = computed(
+  () => pendingDeleteEntry.value?.recurrence !== 'single',
+)
 
 async function setPayment(
   entry: EntryOccurrence,
@@ -381,6 +407,11 @@ function entryMeta(entry: EntryOccurrence) {
           <div class="account-entries__filters">
             <h2 class="sr-only">Lançamentos</h2>
             <UiSegmentedControl v-model="filter" :options="filterOptions" />
+            <UiSegmentedControl
+              v-model="sortBy"
+              :options="entrySortOptions"
+              aria-label="Ordenar lançamentos"
+            />
             <p class="account-entries__count">
               {{ filteredEntries.length }}
               {{ filteredEntries.length === 1 ? 'item' : 'itens' }}
@@ -542,6 +573,15 @@ function entryMeta(entry: EntryOccurrence) {
       :entry="editingEntry"
       @saved="refreshAll"
     />
+    <UiSeriesScopeDialog
+      v-model:open="deleteDialogOpen"
+      title="Excluir lançamento"
+      :description="deleteDialogDescription"
+      :show-scope-options="deleteShowsScope"
+      confirm-label="Excluir"
+      @confirm="confirmDeleteEntry"
+      @cancel="cancelDeleteEntry"
+    />
   </div>
 </template>
 
@@ -646,6 +686,7 @@ function entryMeta(entry: EntryOccurrence) {
 
 .account-entries__filters {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);

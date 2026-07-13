@@ -14,6 +14,7 @@ import {
   settledOccurrencesUntil,
 } from './occurrences'
 import { buildCardInvoice } from './cardInvoice'
+import { buildCashFlowReport } from './cashFlow'
 
 const MONTH_NAMES = [
   'Janeiro',
@@ -209,8 +210,6 @@ export function buildDashboardMonth(monthKey: string): DashboardMonth {
   const today = todayLocal()
   const { end, prevEnd, prevLabel, year, month } = monthBounds(monthKey)
   const currentMonth = today.slice(0, 7)
-  const balanceCutoff =
-    monthKey < currentMonth ? end : monthKey === currentMonth ? today : end
   const totalBalancesAt = (cutoff: string) =>
     roundMoney(
       [...allAccountBalancesAtCutoff(db, cutoff).values()].reduce(
@@ -219,9 +218,18 @@ export function buildDashboardMonth(monthKey: string): DashboardMonth {
       ),
     )
 
-  const previousBalanceValue = totalBalancesAt(prevEnd)
-  const currentBalanceValue = totalBalancesAt(balanceCutoff)
-  const projectedEnd = totalBalancesAt(end)
+  // Uma única fonte de verdade com o relatório de fluxo (inclui faturas no vencimento).
+  const cashFlow = buildCashFlowReport(db, monthKey)
+
+  // Mês passado: saldo no fim do período. Mês atual/futuro: saldo real de hoje
+  // (nunca usar o fim do mês futuro como cutoff — isso marca tudo como liquidado).
+  const currentBalanceValue =
+    monthKey < currentMonth ? totalBalancesAt(end) : totalBalancesAt(today)
+
+  // Período anterior ainda no futuro → abertura projetada do mês ( = fechamento do mês anterior).
+  const previousBalanceValue =
+    prevEnd <= today ? totalBalancesAt(prevEnd) : cashFlow.openingBalance
+
   const monthEntries = occurrencesForCashMonth(db, monthKey)
 
   const invoiceItems: FinanceListItem[] = []
@@ -249,6 +257,7 @@ export function buildDashboardMonth(monthKey: string): DashboardMonth {
       categoryColor: null,
       bankKey: card.bankKey,
       bankColor: card.color,
+      linkTo: `/cartoes/${card.id}?month=${monthKey}`,
     })
   }
 
@@ -285,6 +294,8 @@ export function buildDashboardMonth(monthKey: string): DashboardMonth {
   incomePending = roundMoney(incomePending)
   expensePaid = roundMoney(expensePaid)
 
+  // Previsto no fim do mês = fechamento do fluxo de caixa (mesma projeção do relatório).
+  const projectedEnd = cashFlow.closingBalance
   const monthResult = roundMoney(incomeTotal - expenseTotal)
   const settledBefore = settledOccurrencesUntil(db, prevEnd)
   const incomeUntilPrev = roundMoney(
@@ -363,6 +374,7 @@ export function buildDashboardMonth(monthKey: string): DashboardMonth {
       categoryColor: entry.categoryColor,
       bankKey: null,
       bankColor: null,
+      linkTo: null,
     }))
 
   const incomeItems: FinanceListItem[] = monthEntries
@@ -382,6 +394,7 @@ export function buildDashboardMonth(monthKey: string): DashboardMonth {
       categoryColor: entry.categoryColor,
       bankKey: null,
       bankColor: null,
+      linkTo: null,
     }))
 
   const now = new Date()

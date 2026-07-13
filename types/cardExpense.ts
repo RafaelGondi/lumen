@@ -26,6 +26,8 @@ export interface CardExpenseEditPayload {
   statementName: string | null
   notes: string | null
   date: string
+  /** Total de parcelas da série; só aplica em escopo series/future. */
+  installmentCount: number | null
 }
 
 export interface CardExpenseOccurrence {

@@ -3,7 +3,6 @@ import {
   ArrowDownLeft,
   ArrowLeftRight,
   ArrowUpRight,
-  Calendar,
   CalendarDays,
   Check,
   Layers,
@@ -524,15 +523,7 @@ async function save() {
       </div>
 
       <template v-if="isTransfer">
-        <div class="entry-form__section">
-          <p class="entry-form__label">
-            Data <span aria-hidden="true">*</span>
-          </p>
-          <div class="entry-form__date">
-            <input v-model="dateText" type="text" placeholder="dd / mm / aaaa" />
-            <Calendar aria-hidden="true" />
-          </div>
-        </div>
+        <UiDateField v-model="dateText" label="Data" required />
         <div class="entry-form__status">
           <Check aria-hidden="true" />
           {{ statusLabel }}
@@ -627,40 +618,24 @@ async function save() {
       </div>
 
       <template v-if="isEditing">
-        <div class="entry-form__section">
+        <div v-if="useMonthEnd" class="entry-form__section">
           <p class="entry-form__label">
-            {{ useMonthEnd ? 'Mês' : 'Data' }}
-            <span aria-hidden="true">*</span>
+            Mês <span aria-hidden="true">*</span>
           </p>
-          <div class="entry-form__date">
-            <input
-              v-if="useMonthEnd"
-              v-model="startMonth"
-              type="month"
-              lang="pt-BR"
-              aria-label="Mês"
-            />
-            <input
-              v-else
-              v-model="dateText"
-              type="text"
-              placeholder="dd / mm / aaaa"
-            />
-            <Calendar aria-hidden="true" />
-          </div>
+          <input
+            v-model="startMonth"
+            class="entry-form__month"
+            type="month"
+            lang="pt-BR"
+            aria-label="Mês"
+            required
+          />
         </div>
+        <UiDateField v-else v-model="dateText" label="Data" required />
       </template>
 
       <template v-else-if="recurrence === 'single'">
-        <div class="entry-form__section">
-          <p class="entry-form__label">
-            Data <span aria-hidden="true">*</span>
-          </p>
-          <div class="entry-form__date">
-            <input v-model="dateText" type="text" placeholder="dd / mm / aaaa" />
-            <Calendar aria-hidden="true" />
-          </div>
-        </div>
+        <UiDateField v-model="dateText" label="Data" required />
         <div class="entry-form__status">
           <Check aria-hidden="true" />
           {{ statusLabel }}
@@ -669,15 +644,11 @@ async function save() {
 
       <template v-else-if="recurrence === 'installment'">
         <div class="entry-form__row">
-          <div class="entry-form__section">
-            <p class="entry-form__label">
-              Data da 1ª parcela <span aria-hidden="true">*</span>
-            </p>
-            <div class="entry-form__date">
-              <input v-model="dateText" type="text" placeholder="dd / mm / aaaa" />
-              <Calendar aria-hidden="true" />
-            </div>
-          </div>
+          <UiDateField
+            v-model="dateText"
+            label="Data da 1ª parcela"
+            required
+          />
           <div class="entry-form__section">
             <p class="entry-form__label">
               Nº de parcelas <span aria-hidden="true">*</span>
@@ -698,50 +669,38 @@ async function save() {
       </template>
 
       <template v-else>
-        <div class="entry-form__row">
+        <div v-if="useMonthEnd" class="entry-form__row">
           <div class="entry-form__section">
             <p class="entry-form__label">
-              {{ useMonthEnd ? 'Mês de início' : 'Data de início' }}
-              <span aria-hidden="true">*</span>
+              Mês de início <span aria-hidden="true">*</span>
             </p>
-            <div class="entry-form__date">
-              <input
-                v-if="useMonthEnd"
-                v-model="startMonth"
-                type="month"
-                lang="pt-BR"
-                aria-label="Mês de início"
-              />
-              <input
-                v-else
-                v-model="dateText"
-                type="text"
-                placeholder="dd / mm / aaaa"
-              />
-              <Calendar aria-hidden="true" />
-            </div>
+            <input
+              v-model="startMonth"
+              class="entry-form__month"
+              type="month"
+              lang="pt-BR"
+              aria-label="Mês de início"
+              required
+            />
           </div>
           <div class="entry-form__section">
-            <p class="entry-form__label">
-              {{ useMonthEnd ? 'Mês de fim' : 'Data de fim' }}
-            </p>
-            <div class="entry-form__date">
-              <input
-                v-if="useMonthEnd"
-                v-model="endMonth"
-                type="month"
-                lang="pt-BR"
-                aria-label="Mês de fim"
-              />
-              <input
-                v-else
-                v-model="endDateText"
-                type="text"
-                placeholder="dd / mm / aaaa"
-              />
-              <Calendar aria-hidden="true" />
-            </div>
+            <p class="entry-form__label">Mês de fim</p>
+            <input
+              v-model="endMonth"
+              class="entry-form__month"
+              type="month"
+              lang="pt-BR"
+              aria-label="Mês de fim"
+            />
           </div>
+        </div>
+        <div v-else class="entry-form__row">
+          <UiDateField
+            v-model="dateText"
+            label="Data de início"
+            required
+          />
+          <UiDateField v-model="endDateText" label="Data de fim" />
         </div>
         <label class="entry-form__month-end">
           <input v-model="useMonthEnd" type="checkbox" />
@@ -889,8 +848,8 @@ async function save() {
 }
 
 .entry-form__money,
-.entry-form__date,
 .entry-form__number,
+.entry-form__month,
 .entry-form__notes,
 .entry-form__select {
   min-height: 2.5rem;
@@ -901,8 +860,7 @@ async function save() {
   font-size: var(--text-sm);
 }
 
-.entry-form__money,
-.entry-form__date {
+.entry-form__money {
   display: flex;
   width: 100%;
   min-width: 0;
@@ -913,8 +871,8 @@ async function save() {
 }
 
 .entry-form__money:focus-within,
-.entry-form__date:focus-within,
 .entry-form__number:focus,
+.entry-form__month:focus,
 .entry-form__notes:focus {
   outline: none;
   border-color: var(--color-brand);
@@ -926,8 +884,7 @@ async function save() {
   font-weight: var(--weight-medium);
 }
 
-.entry-form__money input,
-.entry-form__date input {
+.entry-form__money input {
   width: 100%;
   min-width: 0;
   flex: 1;
@@ -936,18 +893,12 @@ async function save() {
   font-variant-numeric: tabular-nums;
 }
 
-.entry-form__money input:focus,
-.entry-form__date input:focus {
+.entry-form__money input:focus {
   outline: none;
 }
 
-.entry-form__date svg {
-  width: 1rem;
-  height: 1rem;
-  color: var(--color-ink-muted);
-}
-
-.entry-form__number {
+.entry-form__number,
+.entry-form__month {
   width: 100%;
   padding: 0 var(--space-3);
 }

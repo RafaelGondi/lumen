@@ -138,10 +138,24 @@ export function parseCardExpenseEditPayload(
     badRequest('Competência da ocorrência inválida.')
   }
 
+  let installmentCount: number | null = null
+  if (raw.installmentCount !== null && raw.installmentCount !== undefined) {
+    if (
+      typeof raw.installmentCount !== 'number' ||
+      !Number.isInteger(raw.installmentCount) ||
+      raw.installmentCount < 2 ||
+      raw.installmentCount > 60
+    ) {
+      badRequest('Informe de 2 a 60 parcelas.')
+    }
+    installmentCount = raw.installmentCount
+  }
+
   return {
     ...common,
     scope: raw.scope as EntrySeriesScope,
     occurrenceMonth: raw.occurrenceMonth,
+    installmentCount,
   }
 }
 

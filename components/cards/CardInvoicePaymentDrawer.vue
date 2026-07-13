@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Calendar } from '@lucide/vue'
 import type { Account } from '~/types/account'
 import type { Card } from '~/types/card'
 import type { CardInvoiceDetail } from '~/types/cardInvoice'
@@ -217,20 +216,11 @@ async function save() {
         </select>
       </div>
 
-      <div class="invoice-pay__section">
-        <p class="invoice-pay__field-label">
-          Data do pagamento <span>*</span>
-        </p>
-        <div class="invoice-pay__date">
-          <input
-            v-model="paymentDateText"
-            type="text"
-            placeholder="dd / mm / aaaa"
-            aria-label="Data do pagamento"
-          />
-          <Calendar aria-hidden="true" />
-        </div>
-      </div>
+      <UiDateField
+        v-model="paymentDateText"
+        label="Data do pagamento"
+        required
+      />
 
       <div class="invoice-pay__section">
         <div class="invoice-pay__field-head">
@@ -341,7 +331,6 @@ async function save() {
 }
 
 .invoice-pay__select,
-.invoice-pay__date,
 .invoice-pay__money {
   min-height: 2.5rem;
   border: 1px solid var(--color-border-strong);
@@ -357,7 +346,6 @@ async function save() {
   box-sizing: border-box;
 }
 
-.invoice-pay__date,
 .invoice-pay__money {
   display: flex;
   padding: 0 var(--space-3);
@@ -365,14 +353,12 @@ async function save() {
   gap: var(--space-2);
 }
 
-.invoice-pay__date:focus-within,
 .invoice-pay__money:focus-within,
 .invoice-pay__select:focus {
   outline: 2px solid var(--color-brand);
   outline-offset: 1px;
 }
 
-.invoice-pay__date input,
 .invoice-pay__money input {
   width: 100%;
   border: 0;
@@ -381,15 +367,8 @@ async function save() {
   font-size: var(--text-sm);
 }
 
-.invoice-pay__date input:focus,
 .invoice-pay__money input:focus {
   outline: none;
-}
-
-.invoice-pay__date svg {
-  width: 1rem;
-  height: 1rem;
-  color: var(--color-ink-muted);
 }
 
 .invoice-pay__money span {

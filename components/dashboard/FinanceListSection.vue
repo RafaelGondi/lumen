@@ -36,6 +36,11 @@ function statusSideLabel(item: FinanceListItem) {
   if (item.settled) return 'Recebido'
   return 'A receber'
 }
+
+function openItem(item: FinanceListItem) {
+  if (!item.linkTo) return
+  void navigateTo(item.linkTo)
+}
 </script>
 
 <template>
@@ -61,59 +66,72 @@ function statusSideLabel(item: FinanceListItem) {
         class="finance-list__group"
       >
         <ul class="finance-list__items">
-          <li
-            v-for="item in group.items"
-            :key="item.id"
-            class="finance-list__row"
-            :class="{ 'finance-list__row--settled': item.settled && kind === 'payables' }"
-          >
-            <div class="finance-list__icon" aria-hidden="true">
-              <AccountsBankMark
-                v-if="item.kind === 'card_invoice' && item.bankKey && item.bankColor"
-                :name="item.account"
-                :color="item.bankColor"
-                :bank-key="(item.bankKey as BankKey)"
-                tint
-                size="md"
-              />
-              <CategoriesCategoryIconChip
-                v-else-if="item.categoryIcon && item.categoryColor"
-                :icon="item.categoryIcon"
-                :color="item.categoryColor"
-              />
-              <span
-                v-else
-                class="finance-list__fallback"
-                :class="{
-                  'finance-list__fallback--invoice': item.kind === 'card_invoice',
-                }"
-              >
-                <CreditCard v-if="item.kind === 'card_invoice'" />
-                <Receipt v-else />
-              </span>
-            </div>
+          <li v-for="item in group.items" :key="item.id">
+            <div
+              class="finance-list__row"
+              :class="{
+                'finance-list__row--link': Boolean(item.linkTo),
+                'finance-list__row--settled':
+                  item.settled && kind === 'payables',
+              }"
+              :role="item.linkTo ? 'link' : undefined"
+              :tabindex="item.linkTo ? 0 : undefined"
+              @click="openItem(item)"
+              @keydown.enter.prevent="openItem(item)"
+            >
+              <div class="finance-list__icon" aria-hidden="true">
+                <AccountsBankMark
+                  v-if="
+                    item.kind === 'card_invoice' &&
+                    item.bankKey &&
+                    item.bankColor
+                  "
+                  :name="item.account"
+                  :color="item.bankColor"
+                  :bank-key="(item.bankKey as BankKey)"
+                  tint
+                  size="md"
+                />
+                <CategoriesCategoryIconChip
+                  v-else-if="item.categoryIcon && item.categoryColor"
+                  :icon="item.categoryIcon"
+                  :color="item.categoryColor"
+                />
+                <span
+                  v-else
+                  class="finance-list__fallback"
+                  :class="{
+                    'finance-list__fallback--invoice':
+                      item.kind === 'card_invoice',
+                  }"
+                >
+                  <CreditCard v-if="item.kind === 'card_invoice'" />
+                  <Receipt v-else />
+                </span>
+              </div>
 
-            <div class="finance-list__identity">
-              <p>{{ item.name }}</p>
-              <span>{{ itemMeta(item) }}</span>
-            </div>
+              <div class="finance-list__identity">
+                <p>{{ item.name }}</p>
+                <span>{{ itemMeta(item) }}</span>
+              </div>
 
-            <div class="finance-list__amount-wrap">
-              <p
-                class="finance-list__amount numeric"
-                :class="`finance-list__amount--${kind}`"
-              >
-                <UiMoney :value="item.amount" />
-              </p>
-              <span
-                v-if="statusSideLabel(item)"
-                class="finance-list__side-status"
-                :class="{
-                  'finance-list__side-status--received': item.settled,
-                }"
-              >
-                {{ statusSideLabel(item) }}
-              </span>
+              <div class="finance-list__amount-wrap">
+                <p
+                  class="finance-list__amount numeric"
+                  :class="`finance-list__amount--${kind}`"
+                >
+                  <UiMoney :value="item.amount" />
+                </p>
+                <span
+                  v-if="statusSideLabel(item)"
+                  class="finance-list__side-status"
+                  :class="{
+                    'finance-list__side-status--received': item.settled,
+                  }"
+                >
+                  {{ statusSideLabel(item) }}
+                </span>
+              </div>
             </div>
           </li>
         </ul>
@@ -218,6 +236,22 @@ function statusSideLabel(item: FinanceListItem) {
   grid-template-columns: 2.25rem minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
+  color: inherit;
+  text-decoration: none;
+}
+
+.finance-list__row--link {
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.finance-list__row--link:hover {
+  background: var(--color-surface-subtle);
+}
+
+.finance-list__row--link:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: -2px;
 }
 
 .finance-list__row--settled .finance-list__identity p,

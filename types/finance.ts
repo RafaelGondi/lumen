@@ -40,6 +40,8 @@ export interface FinanceListItem {
   /** Presente em faturas de cartão. */
   bankKey: string | null
   bankColor: string | null
+  /** Atalho opcional (ex.: fatura → página do cartão). */
+  linkTo: string | null
 }
 
 export interface FinanceListGroup {

@@ -5,10 +5,13 @@ const props = withDefaults(
   defineProps<{
     items: CardInvoiceProjectionMonth[]
     total: number
+    /** Mês da fatura atualmente aberta (YYYY-MM). */
+    activeMonth?: string | null
     title?: string
     subtitle?: string
   }>(),
   {
+    activeMonth: null,
     title: 'Projeção de faturas',
     subtitle:
       'Próximos 12 meses — clique numa barra para abrir a fatura do mês.',
@@ -101,8 +104,12 @@ function barHeight(amount: number) {
             :key="item.month"
             type="button"
             class="projection-chart__col"
+            :class="{
+              'projection-chart__col--selected': activeMonth === item.month,
+            }"
             role="listitem"
             :aria-label="`${formatMonthKey(item.month)}: ${formatTooltipMoney(item.amount)}`"
+            :aria-pressed="activeMonth === item.month"
             @mouseenter="hoveredMonth = item.month"
             @mouseleave="hoveredMonth = null"
             @focus="hoveredMonth = item.month"
@@ -117,7 +124,7 @@ function barHeight(amount: number) {
                 }"
               >
                 <div
-                  v-if="hoveredMonth === item.month"
+                  v-if="hoveredMonth === item.month || activeMonth === item.month"
                   class="projection-chart__tooltip"
                   role="tooltip"
                 >
@@ -138,7 +145,11 @@ function barHeight(amount: number) {
                   :class="{
                     'projection-chart__bar--empty': item.amount <= 0,
                     'projection-chart__bar--residual': item.residual,
-                    'projection-chart__bar--active': hoveredMonth === item.month,
+                    'projection-chart__bar--active':
+                      hoveredMonth === item.month ||
+                      activeMonth === item.month,
+                    'projection-chart__bar--selected':
+                      activeMonth === item.month,
                   }"
                 />
               </div>
@@ -285,8 +296,19 @@ function barHeight(amount: number) {
   box-shadow: 0 0 0 3px var(--color-brand-soft);
 }
 
-.projection-chart__bar--residual.projection-chart__bar--active {
+.projection-chart__bar--selected {
+  background: var(--color-brand-ink);
+  box-shadow: 0 0 0 3px var(--color-brand-soft);
+}
+
+.projection-chart__bar--residual.projection-chart__bar--active,
+.projection-chart__bar--residual.projection-chart__bar--selected {
   background: color-mix(in srgb, var(--color-brand) 55%, white);
+}
+
+.projection-chart__col--selected small {
+  color: var(--color-brand-ink);
+  font-weight: var(--weight-semibold);
 }
 
 .projection-chart__col small {

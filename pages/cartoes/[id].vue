@@ -1,15 +1,12 @@
 <script setup lang="ts">
 import {
   ArrowLeft,
-  Copy,
+  ChevronDown,
   CreditCard,
-  Pencil,
   PieChart,
   Plus,
-  Receipt,
   Search,
   SlidersHorizontal,
-  Trash2,
   Wallet,
 } from '@lucide/vue'
 import type { Card } from '~/types/card'
@@ -17,6 +14,13 @@ import type { CardInvoiceDetail } from '~/types/cardInvoice'
 import type { EntrySeriesScope } from '~/types/entry'
 import { transacaoFaturaMonth } from '~/utils/cardInvoiceCycle'
 import { formatDateBr, roundMoney } from '~/utils/dateMoney'
+import {
+  defaultSortDir,
+  entrySortOptions,
+  groupEntriesByCategory,
+  sortEntries,
+  type EntrySortKey,
+} from '~/utils/sortEntries'
 
 const MONTH_NAMES = [
   'Janeiro',
@@ -40,9 +44,17 @@ const selectedYear = ref(now.getFullYear())
 const selectedMonth = ref(now.getMonth() + 1)
 const invoiceMonthInitialized = ref(false)
 const searchQuery = ref('')
+const sortBy = ref<EntrySortKey>('date')
+const sortDir = ref<'asc' | 'desc'>(defaultSortDir('date'))
+const expandedCategoryKeys = ref<string[]>([])
+const invoiceSectionRef = ref<HTMLElement | null>(null)
 const expenseDrawerOpen = ref(false)
 const adjustmentDrawerOpen = ref(false)
 const paymentDrawerOpen = ref(false)
+const deleteDialogOpen = ref(false)
+const pendingDeleteExpense = ref<CardInvoiceDetail['entries'][number] | null>(
+  null,
+)
 const editingExpense = ref<CardInvoiceDetail['entries'][number] | null>(null)
 const duplicatingExpense = ref<CardInvoiceDetail['entries'][number] | null>(
   null,
@@ -58,6 +70,16 @@ function setMonthKey(key: string) {
   if (!year || !month) return
   selectedYear.value = year
   selectedMonth.value = month
+}
+
+function selectProjectionMonth(key: string) {
+  setMonthKey(key)
+  nextTick(() => {
+    invoiceSectionRef.value?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  })
 }
 
 function currentInvoiceMonthKey(closingDay: number) {
@@ -91,7 +113,12 @@ watch(
   card,
   (value) => {
     if (!value || invoiceMonthInitialized.value) return
-    setMonthKey(currentInvoiceMonthKey(value.closingDay))
+    const queryMonth = route.query.month
+    if (typeof queryMonth === 'string' && /^\d{4}-\d{2}$/.test(queryMonth)) {
+      setMonthKey(queryMonth)
+    } else {
+      setMonthKey(currentInvoiceMonthKey(value.closingDay))
+    }
     invoiceMonthInitialized.value = true
   },
   { immediate: true },
@@ -161,7 +188,7 @@ const visibleCategories = computed(() => {
   ]
 })
 
-const filteredEntries = computed(() => {
+const filteredBase = computed(() => {
   const entries = invoice.value?.entries ?? []
   const term = searchQuery.value.trim().toLowerCase()
   if (!term) return entries
@@ -179,6 +206,42 @@ const filteredEntries = computed(() => {
     )
   })
 })
+
+const filteredEntries = computed(() =>
+  sortEntries(
+    filteredBase.value,
+    sortBy.value === 'category' ? 'date' : sortBy.value,
+    sortBy.value === 'category' ? 'desc' : sortDir.value,
+  ),
+)
+
+const categoryGroups = computed(() =>
+  groupEntriesByCategory(filteredBase.value),
+)
+
+const showCategoryGroups = computed(() => sortBy.value === 'category')
+
+watch(sortBy, (key) => {
+  sortDir.value = defaultSortDir(key)
+  if (key === 'category') {
+    const first = categoryGroups.value[0]
+    expandedCategoryKeys.value = first ? [first.key] : []
+  }
+})
+
+function isCategoryExpanded(key: string) {
+  return expandedCategoryKeys.value.includes(key)
+}
+
+function toggleCategory(key: string) {
+  if (isCategoryExpanded(key)) {
+    expandedCategoryKeys.value = expandedCategoryKeys.value.filter(
+      (item) => item !== key,
+    )
+    return
+  }
+  expandedCategoryKeys.value = [...expandedCategoryKeys.value, key]
+}
 
 function shiftMonth(delta: number) {
   const date = new Date(selectedYear.value, selectedMonth.value - 1 + delta, 1)
@@ -226,30 +289,38 @@ watch(expenseDrawerOpen, (value) => {
   }
 })
 
-function chooseDeleteScope(): EntrySeriesScope | null {
-  const answer = window.prompt(
-    'Excluir: digite 1 para só esta ocorrência, 2 para esta e as próximas, ou 3 para a série inteira.',
-    '1',
-  )
-  if (answer === '1') return 'occurrence'
-  if (answer === '2') return 'future'
-  if (answer === '3') return 'series'
-  return null
+function removeExpense(expense: CardInvoiceDetail['entries'][number]) {
+  pendingDeleteExpense.value = expense
+  deleteDialogOpen.value = true
 }
 
-async function removeExpense(
-  expense: CardInvoiceDetail['entries'][number],
-) {
-  const scope =
-    expense.recurrence === 'single' ? 'series' : chooseDeleteScope()
-  if (!scope) return
-  if (!window.confirm(`Excluir a despesa "${expense.description}"?`)) return
+async function confirmDeleteExpense(scope: EntrySeriesScope) {
+  const expense = pendingDeleteExpense.value
+  pendingDeleteExpense.value = null
+  if (!expense) return
   await $fetch(
     `/api/cards/${cardId.value}/expenses/${expense.parentId}?scope=${scope}&occurrenceMonth=${expense.occurrenceMonth}`,
     { method: 'DELETE' },
   )
   await refreshInvoice()
 }
+
+function cancelDeleteExpense() {
+  pendingDeleteExpense.value = null
+}
+
+const deleteDialogDescription = computed(() => {
+  const expense = pendingDeleteExpense.value
+  if (!expense) return 'Escolha o alcance da exclusão.'
+  if (expense.recurrence === 'single') {
+    return `Excluir "${expense.description}"?`
+  }
+  return `Excluir "${expense.description}". Escolha o alcance:`
+})
+
+const deleteShowsScope = computed(
+  () => pendingDeleteExpense.value?.recurrence !== 'single',
+)
 
 async function onPaymentSaved() {
   await Promise.all([refreshInvoice(), refreshCard()])
@@ -358,29 +429,39 @@ async function onPaymentSaved() {
         <CardsInvoiceProjectionChart
           :items="invoice?.projection ?? []"
           :total="projectionTotal"
-          @select="setMonthKey"
+          :active-month="monthKey"
+          @select="selectProjectionMonth"
         />
       </UiCard>
 
-      <div class="card-month-nav">
-        <UiMonthSwitcher
-          :label="monthLabel"
-          :can-go-previous="true"
-          :can-go-next="true"
-          :is-current="isCurrentMonth"
-          @previous="shiftMonth(-1)"
-          @next="shiftMonth(1)"
-          @current="goToCurrentMonth"
-        />
-      </div>
+      <div ref="invoiceSectionRef" class="card-invoice-anchor">
+        <div class="card-month-nav">
+          <UiMonthSwitcher
+            :label="monthLabel"
+            :can-go-previous="true"
+            :can-go-next="true"
+            :is-current="isCurrentMonth"
+            @previous="shiftMonth(-1)"
+            @next="shiftMonth(1)"
+            @current="goToCurrentMonth"
+          />
+        </div>
 
-      <UiCard v-if="invoicePending && !invoice" class="card-invoice">
-        <UiSkeleton width="8rem" height="0.9rem" />
-        <UiSkeleton width="10rem" height="2rem" class="card-detail-page__gap" />
-        <UiSkeleton height="0.4rem" radius="sm" class="card-detail-page__gap" />
-      </UiCard>
+        <UiCard v-if="invoicePending && !invoice" class="card-invoice">
+          <UiSkeleton width="8rem" height="0.9rem" />
+          <UiSkeleton
+            width="10rem"
+            height="2rem"
+            class="card-detail-page__gap"
+          />
+          <UiSkeleton
+            height="0.4rem"
+            radius="sm"
+            class="card-detail-page__gap"
+          />
+        </UiCard>
 
-      <UiCard v-else-if="invoice" class="card-invoice">
+        <UiCard v-else-if="invoice" class="card-invoice">
         <div class="card-invoice__top">
           <div>
             <p class="card-invoice__label">Fatura de {{ invoice.monthLabel }}</p>
@@ -467,6 +548,7 @@ async function onPaymentSaved() {
           </UiButton>
         </div>
       </UiCard>
+      </div>
 
       <UiCard class="card-categories">
         <div class="card-categories__heading">
@@ -523,6 +605,11 @@ async function onPaymentSaved() {
               {{ filteredEntries.length === 1 ? 'item' : 'itens' }}
             </p>
           </div>
+          <UiSegmentedControl
+            v-model="sortBy"
+            :options="entrySortOptions"
+            aria-label="Ordenar lançamentos"
+          />
         </div>
 
         <div class="card-entries__search">
@@ -535,78 +622,75 @@ async function onPaymentSaved() {
           />
         </div>
 
-        <UiList v-if="filteredEntries.length">
+        <div v-if="filteredEntries.length && showCategoryGroups" class="card-entry-groups">
+          <section
+            v-for="group in categoryGroups"
+            :key="group.key"
+            class="card-entry-group"
+          >
+            <button
+              type="button"
+              class="card-entry-group__header"
+              :aria-expanded="isCategoryExpanded(group.key)"
+              @click="toggleCategory(group.key)"
+            >
+              <span class="card-entry-group__icon" aria-hidden="true">
+                <CategoriesCategoryIconChip
+                  v-if="group.categoryIcon && group.categoryColor"
+                  :icon="group.categoryIcon"
+                  :color="group.categoryColor"
+                />
+                <span v-else class="card-entry-group__fallback">?</span>
+              </span>
+              <span class="card-entry-group__meta">
+                <strong>{{ group.name }}</strong>
+                <span>
+                  {{ group.entries.length }}
+                  {{ group.entries.length === 1 ? 'item' : 'itens' }}
+                </span>
+              </span>
+              <strong class="card-entry-group__total">
+                <UiMoney :value="group.total" />
+              </strong>
+              <ChevronDown
+                class="card-entry-group__chevron"
+                :class="{
+                  'card-entry-group__chevron--open': isCategoryExpanded(
+                    group.key,
+                  ),
+                }"
+                aria-hidden="true"
+              />
+            </button>
+            <div
+              v-show="isCategoryExpanded(group.key)"
+              class="card-entry-group__body"
+            >
+              <CardsCardInvoiceEntryRow
+                v-for="entry in group.entries"
+                :key="entry.id"
+                :entry="entry"
+                compact
+                @duplicate="openDuplicateDrawer(entry)"
+                @edit="openExpenseDrawer(entry)"
+                @remove="removeExpense(entry)"
+              />
+            </div>
+          </section>
+        </div>
+
+        <UiList v-else-if="filteredEntries.length">
           <UiListItem
             v-for="entry in filteredEntries"
             :key="entry.id"
-            class="card-entry"
+            class="card-entry-wrap"
           >
-            <div class="card-entry__icon" aria-hidden="true">
-              <CategoriesCategoryIconChip
-                v-if="entry.categoryIcon && entry.categoryColor"
-                :icon="entry.categoryIcon"
-                :color="entry.categoryColor"
-              />
-              <span v-else class="card-entry__fallback">
-                <Receipt />
-              </span>
-            </div>
-            <div class="card-entry__main">
-              <p>{{ entry.description }}</p>
-              <span>
-                {{ formatDateBr(entry.date) }}
-                <template v-if="entry.categoryName">
-                  · {{ entry.categoryName }}
-                </template>
-                <template
-                  v-if="
-                    entry.recurrence === 'installment' &&
-                    entry.installmentIndex &&
-                    entry.installmentCount
-                  "
-                >
-                  · {{ entry.installmentIndex }}/{{ entry.installmentCount }}
-                </template>
-                <template v-else-if="entry.recurrence === 'fixed'">
-                  · Fixa
-                </template>
-              </span>
-              <small v-if="entry.statementName">
-                {{ entry.statementName }}
-              </small>
-              <small v-if="entry.notes">{{ entry.notes }}</small>
-            </div>
-            <strong class="card-entry__amount">
-              -
-              <UiMoney :value="entry.amount" />
-            </strong>
-            <div class="card-entry__actions">
-              <button
-                type="button"
-                aria-label="Duplicar despesa"
-                title="Duplicar despesa"
-                @click="openDuplicateDrawer(entry)"
-              >
-                <Copy aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                aria-label="Editar despesa"
-                title="Editar despesa"
-                @click="openExpenseDrawer(entry)"
-              >
-                <Pencil aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                class="card-entry__delete"
-                aria-label="Excluir despesa"
-                title="Excluir despesa"
-                @click="removeExpense(entry)"
-              >
-                <Trash2 aria-hidden="true" />
-              </button>
-            </div>
+            <CardsCardInvoiceEntryRow
+              :entry="entry"
+              @duplicate="openDuplicateDrawer(entry)"
+              @edit="openExpenseDrawer(entry)"
+              @remove="removeExpense(entry)"
+            />
           </UiListItem>
         </UiList>
 
@@ -645,6 +729,15 @@ async function onPaymentSaved() {
         :card="card"
         :invoice="invoice"
         @saved="onPaymentSaved"
+      />
+      <UiSeriesScopeDialog
+        v-model:open="deleteDialogOpen"
+        title="Excluir despesa"
+        :description="deleteDialogDescription"
+        :show-scope-options="deleteShowsScope"
+        confirm-label="Excluir"
+        @confirm="confirmDeleteExpense"
+        @cancel="cancelDeleteExpense"
       />
     </div>
   </div>
@@ -794,6 +887,13 @@ async function onPaymentSaved() {
 .card-month-nav {
   display: flex;
   justify-content: flex-start;
+}
+
+.card-invoice-anchor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  scroll-margin-top: var(--space-6);
 }
 
 .card-invoice__top {
@@ -1035,6 +1135,14 @@ async function onPaymentSaved() {
   padding: var(--space-5) var(--space-5) 0;
 }
 
+.card-entries__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .card-entries__search {
   display: flex;
   margin-top: var(--space-4);
@@ -1064,25 +1172,47 @@ async function onPaymentSaved() {
   outline: none;
 }
 
-.card-entry {
-  display: flex;
-  padding: var(--space-4) var(--space-5);
-  align-items: center;
-  gap: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.card-entry:last-child {
+.card-entry-wrap :deep(.card-entry) {
   border-bottom: 0;
 }
 
-.card-entry__icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
+.card-entry-wrap + .card-entry-wrap {
+  border-top: 1px solid var(--color-border);
 }
 
-.card-entry__fallback {
+.card-entry-groups {
+  border-top: 1px solid var(--color-border);
+}
+
+.card-entry-group + .card-entry-group {
+  border-top: 1px solid var(--color-border);
+}
+
+.card-entry-group__header {
+  display: flex;
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  align-items: center;
+  gap: var(--space-3);
+  border: 0;
+  background: var(--color-surface);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.card-entry-group__header:hover {
+  background: var(--color-surface-subtle);
+}
+
+.card-entry-group__icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+}
+
+.card-entry-group__fallback {
   display: grid;
   width: 2.25rem;
   height: 2.25rem;
@@ -1090,79 +1220,57 @@ async function onPaymentSaved() {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface-subtle);
-  color: var(--color-ink-secondary);
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
 }
 
-.card-entry__fallback svg {
-  width: 1rem;
-  height: 1rem;
-}
-
-.card-entry__main {
+.card-entry-group__meta {
+  display: flex;
   min-width: 0;
   flex: 1;
+  flex-direction: column;
+  gap: 0.15rem;
 }
 
-.card-entry__main p {
+.card-entry-group__meta strong {
   color: var(--color-ink);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
 }
 
-.card-entry__main span,
-.card-entry__main small {
-  display: block;
-  margin-top: 0.15rem;
+.card-entry-group__meta span {
   color: var(--color-ink-muted);
   font-size: var(--text-xs);
 }
 
-.card-entry__amount {
-  color: var(--color-negative-ink);
+.card-entry-group__total {
+  color: var(--color-ink);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.card-entry__actions {
-  display: flex;
-  gap: 0.125rem;
-  opacity: 0;
-  transition: opacity var(--transition-fast);
+.card-entry-group__chevron {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: var(--color-ink-muted);
+  transition: transform var(--transition-fast);
 }
 
-.card-entry:hover .card-entry__actions,
-.card-entry:focus-within .card-entry__actions {
-  opacity: 1;
+.card-entry-group__chevron--open {
+  transform: rotate(180deg);
 }
 
-.card-entry__actions button {
-  display: grid;
-  width: 1.75rem;
-  height: 1.75rem;
-  padding: 0;
-  place-items: center;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-ink-secondary);
-  cursor: pointer;
+.card-entry-group__body {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-subtle);
 }
 
-.card-entry__actions button:hover {
-  border-color: var(--color-border-strong);
-  color: var(--color-ink);
-}
-
-.card-entry__actions .card-entry__delete:hover {
-  border-color: var(--color-negative);
-  color: var(--color-negative);
-}
-
-.card-entry__actions svg {
-  width: 0.85rem;
-  height: 0.85rem;
+.card-entry-group__body :deep(.card-entry:last-child) {
+  border-bottom: 0;
 }
 
 @media (max-width: 860px) {
@@ -1177,6 +1285,10 @@ async function onPaymentSaved() {
 
   .card-invoice__dates {
     text-align: left;
+  }
+
+  .card-entry-group__body :deep(.card-entry--compact) {
+    padding-left: var(--space-5);
   }
 }
 </style>

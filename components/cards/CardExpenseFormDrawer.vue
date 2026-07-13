@@ -85,9 +85,30 @@ const installmentPreview = computed(() => {
   const date = parseDateBr(dateText.value)
   const amount = amountValue.value
   if (!date || !amount || installmentCount.value < 2) return null
-  const end = addMonthsLocal(date, installmentCount.value - 1)
-  return `${installmentCount.value}x de ${formatCurrency(amount)} · até ${formatDateBr(end)}`
+
+  // Preview do fim deve seguir a competência da fatura (fechamento do cartão),
+  // não só o mês civil da última compra.
+  let seriesStart = date
+  if (
+    isEditing.value &&
+    props.expense?.installmentIndex &&
+    props.expense.installmentIndex > 1
+  ) {
+    seriesStart = addMonthsLocal(date, -(props.expense.installmentIndex - 1))
+  }
+  const lastPurchase = addMonthsLocal(
+    seriesStart,
+    installmentCount.value - 1,
+  )
+  const lastInvoiceMonth = transacaoFaturaMonth(
+    lastPurchase,
+    props.card.closingDay,
+  )
+  return `${installmentCount.value}x de ${formatCurrency(amount)} · até fatura de ${formatInvoiceMonthLabel(lastInvoiceMonth)}`
 })
+const showInstallmentFields = computed(
+  () => recurrence.value === 'installment',
+)
 const fixedPreview = computed(() => {
   if (recurrence.value !== 'fixed') return null
   const date = parseDateBr(dateText.value)
@@ -95,6 +116,27 @@ const fixedPreview = computed(() => {
   if (useMonthEnd.value) return 'Todo mês no último dia'
   return `Todo mês no dia ${Number(date.slice(8, 10))}`
 })
+
+const INVOICE_MONTH_SHORT = [
+  'jan',
+  'fev',
+  'mar',
+  'abr',
+  'mai',
+  'jun',
+  'jul',
+  'ago',
+  'set',
+  'out',
+  'nov',
+  'dez',
+]
+
+function formatInvoiceMonthLabel(monthKey: string) {
+  const [year, month] = monthKey.split('-').map(Number)
+  if (!year || !month) return monthKey
+  return `${INVOICE_MONTH_SHORT[month - 1]}/${year}`
+}
 
 function todayBr() {
   const now = new Date()
@@ -214,6 +256,13 @@ watch(open, (value) => {
   if (value) resetForm()
 })
 
+watch(installmentCount, (value) => {
+  if (!open.value || !isEditing.value || !props.expense) return
+  if (props.expense.recurrence !== 'installment') return
+  if (value === props.expense.installmentCount) return
+  if (editScope.value === 'occurrence') editScope.value = 'series'
+})
+
 async function save() {
   const amount = amountValue.value
   const date = parseDateBr(dateText.value)
@@ -237,22 +286,39 @@ async function save() {
     let invoiceMonth: string | undefined
 
     if (isEditing.value && props.expense) {
+      if (
+        props.expense.recurrence === 'installment' &&
+        installmentCount.value < 2
+      ) {
+        errorMessage.value = 'Informe ao menos duas parcelas.'
+        return
+      }
+      const countChanged =
+        props.expense.recurrence === 'installment' &&
+        installmentCount.value !== (props.expense.installmentCount ?? null)
+      const scope =
+        props.expense.recurrence === 'single'
+          ? 'series'
+          : countChanged
+            ? 'series'
+            : editScope.value
       await $fetch(
         `/api/cards/${props.card.id}/expenses/${props.expense.parentId}`,
         {
           method: 'PUT',
           body: {
             occurrenceMonth: props.expense.occurrenceMonth,
-            scope:
-              props.expense.recurrence === 'single'
-                ? 'series'
-                : editScope.value,
+            scope,
             description: description.value.trim(),
             amount,
             categoryId: categoryId.value,
             statementName: statementName.value.trim() || null,
             notes: notes.value.trim() || null,
             date: purchaseDate,
+            installmentCount:
+              props.expense.recurrence === 'installment'
+                ? installmentCount.value
+                : null,
           },
         },
       )
@@ -422,17 +488,23 @@ async function save() {
       </div>
 
       <div
-        v-if="recurrence === 'installment' && !isEditing"
+        v-if="showInstallmentFields"
         class="card-expense-form__row"
       >
         <UiDateField
           v-model="dateText"
-          label="Data da 1ª parcela"
+          :label="isEditing ? 'Data' : 'Data da 1ª parcela'"
           required
         />
         <div class="card-expense-form__section">
           <p class="card-expense-form__label">Nº de parcelas <span>*</span></p>
           <input v-model.number="installmentCount" type="number" min="2" max="60" />
+          <p
+            v-if="isEditing"
+            class="card-expense-form__hint"
+          >
+            Alterar o total aplica na série inteira.
+          </p>
         </div>
       </div>
       <div
@@ -638,6 +710,13 @@ async function save() {
 
 .card-expense-form__summary svg {
   width: 1rem;
+}
+
+.card-expense-form__hint {
+  margin: var(--space-1) 0 0;
+  color: var(--color-ink-muted);
+  font-size: 0.6875rem;
+  line-height: 1.35;
 }
 
 .card-expense-form__error {
