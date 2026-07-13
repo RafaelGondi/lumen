@@ -1,0 +1,33 @@
+{
+  "name": "lumen",
+  "version": "1.0.0",
+  "description": "Showcase de dashboard financeira com Nuxt 3.",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck",
+    "verify:card-cycle": "node verify-card-invoice-cycle.mjs",
+    "verify:card-expenses": "node verify-card-expenses.mjs",
+    "verify:cash-flow": "node verify-cash-flow.mjs",
+    "verify:date-mask": "node verify-date-mask.mjs"
+  },
+  "type": "module",
+  "dependencies": {
+    "@edusites/bancos-brasil": "^1.2.0",
+    "@lucide/vue": "^1.24.0",
+    "@nuxt/fonts": "^0.14.0",
+    "better-sqlite3": "^12.11.1",
+    "nuxt": "^3.21.8",
+    "vue": "^3.5.39",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "typescript": "^6.0.3",
+    "vue-tsc": "^3.3.7"
+  }
+}
