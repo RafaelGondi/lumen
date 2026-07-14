@@ -29,12 +29,12 @@ const desktopSlides = computed<StatSlide[]>(() => [
   { key: 'current', stat: props.currentBalance, icon: WalletCards },
 ])
 
-/** No mobile o saldo atual vem primeiro. */
+/** No mobile: atual → receitas → despesas → saldo anterior. */
 const mobileSlides = computed<StatSlide[]>(() => [
   { key: 'current', stat: props.currentBalance, icon: WalletCards },
-  { key: 'previous', stat: props.previousBalance, icon: Landmark },
   { key: 'revenues', stat: props.revenues, icon: TrendingUp },
   { key: 'expenses', stat: props.expenses, icon: TrendingDown },
+  { key: 'previous', stat: props.previousBalance, icon: Landmark },
 ])
 
 const trackRef = ref<HTMLElement | null>(null)
