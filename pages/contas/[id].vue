@@ -44,6 +44,33 @@ const now = new Date()
 const selectedYear = ref(now.getFullYear())
 const selectedMonth = ref(now.getMonth() + 1)
 
+function setMonthKey(key: string) {
+  const [year, month] = key.split('-').map(Number)
+  if (!year || !month) return
+  selectedYear.value = year
+  selectedMonth.value = month
+}
+
+watch(
+  () => route.query.month,
+  (month) => {
+    if (typeof month === 'string' && /^\d{4}-\d{2}$/.test(month)) {
+      setMonthKey(month)
+    }
+  },
+  { immediate: true },
+)
+
+watch(accountId, () => {
+  const queryMonth = route.query.month
+  if (typeof queryMonth === 'string' && /^\d{4}-\d{2}$/.test(queryMonth)) {
+    setMonthKey(queryMonth)
+  } else {
+    selectedYear.value = now.getFullYear()
+    selectedMonth.value = now.getMonth() + 1
+  }
+})
+
 const monthKey = computed(
   () =>
     `${selectedYear.value}-${String(selectedMonth.value).padStart(2, '0')}`,

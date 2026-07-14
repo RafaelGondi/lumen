@@ -167,6 +167,9 @@ function openItem(item: FinanceListItem) {
 
 <style scoped>
 .finance-list {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -215,6 +218,10 @@ function openItem(item: FinanceListItem) {
 }
 
 .finance-list__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   padding-bottom: var(--space-2);
 }
 
@@ -361,7 +368,7 @@ function openItem(item: FinanceListItem) {
 
 .finance-list__total {
   display: flex;
-  margin: var(--space-2) var(--space-5) var(--space-3);
+  margin: auto var(--space-5) var(--space-3);
   padding-top: var(--space-3);
   align-items: center;
   justify-content: space-between;

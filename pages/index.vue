@@ -126,7 +126,7 @@ const {
   display: grid;
   margin-top: var(--space-5);
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
+  align-items: stretch;
   gap: var(--space-4);
 }
 

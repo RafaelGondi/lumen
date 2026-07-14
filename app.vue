@@ -73,6 +73,7 @@ onBeforeUnmount(() => {
         </nav>
 
         <div class="topbar__actions">
+          <SearchGlobalSearch />
           <button type="button" class="topbar__icon-btn topbar__icon-btn--desktop" aria-label="Ajuda">
             <CircleHelp aria-hidden="true" />
           </button>
