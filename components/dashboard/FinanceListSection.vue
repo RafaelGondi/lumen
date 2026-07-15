@@ -24,6 +24,43 @@ const totalLabel = computed(() =>
   props.kind === 'payables' ? 'Total' : 'Total do mês',
 )
 
+const todayIso = computed(() => {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+})
+
+const tomorrowIso = computed(() => {
+  const [year, month, day] = todayIso.value.split('-').map(Number)
+  const shifted = new Date(year!, month! - 1, day! + 1)
+  return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-${String(shifted.getDate()).padStart(2, '0')}`
+})
+
+const openPayables = computed(() => {
+  if (props.kind !== 'payables') return []
+  return props.section.groups
+    .flatMap((group) => group.items)
+    .filter((item) => !item.settled)
+})
+
+const dueTodayCount = computed(
+  () =>
+    openPayables.value.filter((item) => item.sortDate === todayIso.value)
+      .length,
+)
+
+const dueTomorrowCount = computed(
+  () =>
+    openPayables.value.filter((item) => item.sortDate === tomorrowIso.value)
+      .length,
+)
+
+function dueBadge(item: FinanceListItem): 'hoje' | 'amanha' | null {
+  if (props.kind !== 'payables' || item.settled) return null
+  if (item.sortDate === todayIso.value) return 'hoje'
+  if (item.sortDate === tomorrowIso.value) return 'amanha'
+  return null
+}
+
 function itemMeta(item: FinanceListItem) {
   if (item.kind === 'card_invoice') {
     return `${item.category} · ${item.account}`
@@ -52,6 +89,23 @@ function openItem(item: FinanceListItem) {
           <ArrowDownLeft v-else />
         </span>
         <h2>{{ title }}</h2>
+        <div
+          v-if="dueTodayCount || dueTomorrowCount"
+          class="finance-list__due-summary"
+        >
+          <span
+            v-if="dueTodayCount"
+            class="finance-list__due-chip finance-list__due-chip--today"
+          >
+            {{ dueTodayCount }} hoje
+          </span>
+          <span
+            v-if="dueTomorrowCount"
+            class="finance-list__due-chip finance-list__due-chip--tomorrow"
+          >
+            {{ dueTomorrowCount }} amanhã
+          </span>
+        </div>
       </div>
       <p class="finance-list__sort">
         ↑ mais antigo
@@ -111,8 +165,22 @@ function openItem(item: FinanceListItem) {
               </div>
 
               <div class="finance-list__identity">
-                <p>{{ item.name }}</p>
-                <span>{{ itemMeta(item) }}</span>
+                <p class="finance-list__name">
+                  <span class="finance-list__name-text">{{ item.name }}</span>
+                  <span
+                    v-if="dueBadge(item) === 'hoje'"
+                    class="finance-list__due-chip finance-list__due-chip--today"
+                  >
+                    Hoje
+                  </span>
+                  <span
+                    v-else-if="dueBadge(item) === 'amanha'"
+                    class="finance-list__due-chip finance-list__due-chip--tomorrow"
+                  >
+                    Amanhã
+                  </span>
+                </p>
+                <span class="finance-list__meta">{{ itemMeta(item) }}</span>
               </div>
 
               <div class="finance-list__amount-wrap">
@@ -185,8 +253,10 @@ function openItem(item: FinanceListItem) {
 
 .finance-list__title-line {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .finance-list__title-icon {
@@ -206,6 +276,38 @@ function openItem(item: FinanceListItem) {
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
   letter-spacing: -0.01em;
+}
+
+.finance-list__due-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: var(--space-1);
+}
+
+.finance-list__due-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  min-height: 1.2rem;
+  padding: 0.15rem 0.45rem;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 0.625rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.finance-list__due-chip--today {
+  background: var(--color-negative-soft);
+  color: var(--color-negative-ink);
+}
+
+.finance-list__due-chip--tomorrow {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
 }
 
 .finance-list__sort {
@@ -261,8 +363,8 @@ function openItem(item: FinanceListItem) {
   outline-offset: -2px;
 }
 
-.finance-list__row--settled .finance-list__identity p,
-.finance-list__row--settled .finance-list__identity span,
+.finance-list__row--settled .finance-list__name-text,
+.finance-list__row--settled .finance-list__meta,
 .finance-list__row--settled .finance-list__amount {
   color: var(--color-ink-muted);
   text-decoration: line-through;
@@ -310,16 +412,23 @@ function openItem(item: FinanceListItem) {
   min-width: 0;
 }
 
-.finance-list__identity p {
-  overflow: hidden;
+.finance-list__name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
   color: var(--color-ink);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
+}
+
+.finance-list__name-text {
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.finance-list__identity span {
+.finance-list__meta {
   display: block;
   overflow: hidden;
   margin-top: 0.15rem;

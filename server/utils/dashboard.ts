@@ -58,6 +58,8 @@ function dueDateInMonth(monthKey: string, dueDay: number) {
 
 function formatDayLabel(date: string, today: string): string {
   if (date === today) return 'Hoje'
+  const tomorrow = shiftIsoDate(today, 1)
+  if (date === tomorrow) return 'Amanhã'
   if (date < today) {
     const [, m, d] = date.split('-')
     return `Venceu ${d}/${m}`
@@ -66,6 +68,12 @@ function formatDayLabel(date: string, today: string): string {
   const [, m, d] = date.split('-')
   const monthName = MONTH_NAMES[Number(m) - 1]!.slice(0, 3).toLowerCase()
   return `${Number(d)} ${monthName}.`
+}
+
+function shiftIsoDate(date: string, days: number): string {
+  const [year, month, day] = date.split('-').map(Number)
+  const shifted = new Date(year!, month! - 1, day! + days)
+  return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-${String(shifted.getDate()).padStart(2, '0')}`
 }
 
 function formatDueBr(date: string) {

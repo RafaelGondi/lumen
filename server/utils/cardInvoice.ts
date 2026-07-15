@@ -190,9 +190,21 @@ function markResidualMonths(
   }))
 }
 
+/**
+ * Início da cauda residual: primeiro mês a partir do qual
+ * todas as faturas positivas restantes são residuais.
+ * Evita marcar um mês isolado no começo (ex.: jul baixo antes de ago alto).
+ */
 function residualFromLabel(months: CardInvoiceProjectionMonth[]) {
-  const first = months.find((item) => item.residual)
-  return first ? monthLabel(first.month) : null
+  for (let index = 0; index < months.length; index += 1) {
+    const tail = months.slice(index)
+    const positiveTail = tail.filter((item) => item.amount > 0)
+    if (positiveTail.length === 0) continue
+    if (positiveTail.every((item) => item.residual)) {
+      return monthLabel(positiveTail[0]!.month)
+    }
+  }
+  return null
 }
 
 /**
