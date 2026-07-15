@@ -793,26 +793,24 @@ async function save() {
 
 .entry-form__type {
   display: flex;
-  min-height: 3rem;
-  padding: var(--space-2);
-  flex-direction: column;
+  min-height: 2.75rem;
+  padding: 0 var(--space-2);
   align-items: center;
   justify-content: center;
-  gap: 0.2rem;
+  gap: var(--space-2);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-ink-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
-  line-height: var(--leading-tight);
   cursor: pointer;
 }
 
 .entry-form__type svg {
   flex-shrink: 0;
-  width: 1rem;
-  height: 1rem;
+  width: 0.95rem;
+  height: 0.95rem;
 }
 
 .entry-form__type--active {
