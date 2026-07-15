@@ -119,6 +119,24 @@ const submitLabel = computed(() => {
 const amountLabel = computed(() =>
   recurrence.value === 'installment' ? 'Valor da parcela' : 'Valor',
 )
+/** Saldo disponível na conta de origem para a transferência. */
+const transferAvailable = computed(() => {
+  const balance = props.account.balance
+  if (
+    isEditing.value &&
+    props.entry?.type === 'transfer' &&
+    props.entry.transferDirection === 'out'
+  ) {
+    return roundMoney(balance + props.entry.amount)
+  }
+  return balance
+})
+const canTransferAll = computed(
+  () =>
+    isTransfer.value &&
+    !isEditing.value &&
+    transferAvailable.value > 0,
+)
 const showScopePicker = computed(
   () => isEditing.value && recurrence.value !== 'single',
 )
@@ -293,6 +311,12 @@ function onDestinationChange(event: Event) {
   destinationAccountId.value = value ? Number(value) : null
 }
 
+function transferAll() {
+  if (!canTransferAll.value) return
+  const cents = Math.round(transferAvailable.value * 100)
+  amountText.value = maskBrl(String(cents))
+}
+
 watch(open, async (value) => {
   if (!value) return
   resetForm()
@@ -450,7 +474,7 @@ async function save() {
           @click="setEntryType('transfer')"
         >
           <ArrowLeftRight aria-hidden="true" />
-          Transferência
+          Transferir
         </button>
       </div>
 
@@ -469,6 +493,12 @@ async function save() {
             }}
           </p>
           <span>{{ accountRoleLabel }}</span>
+          <span
+            v-if="isTransfer && !isEditing"
+            class="entry-form__account-balance"
+          >
+            Saldo atual {{ formatCurrency(transferAvailable) }}
+          </span>
         </div>
         <Lock aria-hidden="true" />
       </div>
@@ -504,9 +534,19 @@ async function save() {
       />
 
       <div class="entry-form__section">
-        <p class="entry-form__label">
-          {{ amountLabel }} <span aria-hidden="true">*</span>
-        </p>
+        <div class="entry-form__amount-header">
+          <p class="entry-form__label">
+            {{ amountLabel }} <span aria-hidden="true">*</span>
+          </p>
+          <button
+            v-if="canTransferAll"
+            type="button"
+            class="entry-form__transfer-all"
+            @click="transferAll"
+          >
+            Transferir tudo
+          </button>
+        </div>
         <div class="entry-form__money">
           <span aria-hidden="true">R$</span>
           <input
@@ -753,23 +793,26 @@ async function save() {
 
 .entry-form__type {
   display: flex;
-  min-height: 2.75rem;
-  padding: 0 var(--space-2);
+  min-height: 3rem;
+  padding: var(--space-2);
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: 0.2rem;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-ink-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
   cursor: pointer;
 }
 
 .entry-form__type svg {
-  width: 0.95rem;
-  height: 0.95rem;
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
 }
 
 .entry-form__type--active {
@@ -820,14 +863,48 @@ async function save() {
 }
 
 .entry-form__account span {
+  display: block;
   color: var(--color-ink-muted);
   font-size: var(--text-xs);
+}
+
+.entry-form__account-balance {
+  margin-top: 0.15rem;
+  color: var(--color-ink-secondary);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-medium);
 }
 
 .entry-form__account svg {
   width: 1rem;
   height: 1rem;
   color: var(--color-ink-muted);
+}
+
+.entry-form__amount-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.entry-form__amount-header .entry-form__label {
+  margin: 0;
+}
+
+.entry-form__transfer-all {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-brand);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.entry-form__transfer-all:hover {
+  color: var(--color-brand-hover);
+  text-decoration: underline;
 }
 
 .entry-form__section {
