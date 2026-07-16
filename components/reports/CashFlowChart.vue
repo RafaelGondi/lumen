@@ -14,7 +14,7 @@ const hoveredDate = ref<string | null>(null)
 
 /** Proporção baixa: evita o gráfico “gigante” em telas largas. */
 const width = 840
-const height = 210
+const height = 240
 const padding = { top: 16, right: 12, bottom: 30, left: 48 }
 
 const plotWidth = width - padding.left - padding.right
@@ -220,17 +220,17 @@ function showDot(day: CashFlowDay) {
           <linearGradient id="cashFlowFill" x1="0" y1="0" x2="0" y2="1">
             <stop
               offset="0%"
-              stop-color="var(--color-brand)"
-              stop-opacity="0.22"
+              stop-color="var(--cash-flow-line)"
+              stop-opacity="0.24"
             />
             <stop
               offset="70%"
-              stop-color="var(--color-brand)"
-              stop-opacity="0.05"
+              stop-color="var(--cash-flow-line)"
+              stop-opacity="0.06"
             />
             <stop
               offset="100%"
-              stop-color="var(--color-brand)"
+              stop-color="var(--cash-flow-line)"
               stop-opacity="0"
             />
           </linearGradient>
@@ -381,6 +381,11 @@ function showDot(day: CashFlowDay) {
 </template>
 
 <style scoped>
+.cash-flow-chart {
+  --cash-flow-line: #1c6db8;
+  --cash-flow-line-soft: color-mix(in srgb, var(--cash-flow-line) 72%, white);
+}
+
 .cash-flow-chart__heading {
   margin-bottom: var(--space-3);
 }
@@ -400,7 +405,7 @@ function showDot(day: CashFlowDay) {
 .cash-flow-chart__plot-wrap {
   position: relative;
   width: 100%;
-  height: 15rem;
+  height: 17rem;
 }
 
 .cash-flow-chart__svg {
@@ -422,14 +427,14 @@ function showDot(day: CashFlowDay) {
 }
 
 .cash-flow-chart__line {
-  stroke: var(--color-brand);
+  stroke: var(--cash-flow-line);
   stroke-width: 2.25;
   stroke-linejoin: round;
   stroke-linecap: round;
 }
 
 .cash-flow-chart__today {
-  stroke: color-mix(in srgb, var(--color-brand) 70%, white);
+  stroke: var(--cash-flow-line-soft);
   stroke-width: 1.5;
   stroke-dasharray: 4 5;
 }
@@ -451,7 +456,7 @@ function showDot(day: CashFlowDay) {
 }
 
 .cash-flow-chart__dot {
-  fill: var(--color-brand);
+  fill: var(--cash-flow-line);
   stroke: var(--color-surface);
   stroke-width: 1.5;
 }
@@ -462,7 +467,7 @@ function showDot(day: CashFlowDay) {
 
 .cash-flow-chart__dot--today,
 .cash-flow-chart__dot--active {
-  fill: var(--color-brand-ink);
+  fill: #0f4f8c;
 }
 
 .cash-flow-chart__dot--critical {
@@ -557,13 +562,13 @@ function showDot(day: CashFlowDay) {
 }
 
 .cash-flow-chart__swatch--line {
-  background: var(--color-brand);
+  background: var(--cash-flow-line);
 }
 
 .cash-flow-chart__swatch--today {
   height: 0.85rem;
   width: 0;
-  border-left: 2px dashed color-mix(in srgb, var(--color-brand) 70%, white);
+  border-left: 2px dashed var(--cash-flow-line-soft);
 }
 
 .cash-flow-chart__swatch--negative {

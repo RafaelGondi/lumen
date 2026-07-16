@@ -56,19 +56,35 @@ async function removeAccount(account: Account) {
       </p>
     </section>
 
-    <div v-if="pending" class="accounts-grid" aria-hidden="true">
-      <UiSkeleton v-for="index in 6" :key="index" height="10rem" radius="md" />
-    </div>
+    <UiSnapCarousel
+      v-if="pending"
+      class="accounts-list"
+      :items="[1, 2, 3, 4, 5, 6]"
+      :get-key="(item) => item"
+      aria-label="Carregando contas"
+      aria-hidden="true"
+    >
+      <template #default>
+        <UiSkeleton height="10rem" radius="md" />
+      </template>
+    </UiSnapCarousel>
 
-    <div v-else-if="accounts.length" class="accounts-grid">
-      <AccountsAccountCard
-        v-for="account in accounts"
-        :key="account.id"
-        :account="account"
-        @edit="openDrawer(account)"
-        @remove="removeAccount(account)"
-      />
-    </div>
+    <UiSnapCarousel
+      v-else-if="accounts.length"
+      class="accounts-list"
+      :items="accounts"
+      :get-key="(account) => account.id"
+      aria-label="Contas bancárias"
+      dots-label="Contas"
+    >
+      <template #default="{ item: account }">
+        <AccountsAccountCard
+          :account="account"
+          @edit="openDrawer(account)"
+          @remove="removeAccount(account)"
+        />
+      </template>
+    </UiSnapCarousel>
 
     <UiCard v-else padding="none">
       <UiEmptyState
@@ -127,27 +143,14 @@ async function removeAccount(account: Account) {
   font-size: var(--text-xs);
 }
 
-.accounts-grid {
-  display: grid;
+.accounts-list {
   margin-top: var(--space-5);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-4);
 }
 
 @media (max-width: 900px) {
   .accounts-summary {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .accounts-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 560px) {
-  .accounts-grid {
-    grid-template-columns: 1fr;
   }
 }
 </style>

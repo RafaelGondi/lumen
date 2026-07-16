@@ -129,19 +129,33 @@ async function removeCard(card: Card) {
       </UiCard>
     </div>
 
-    <div v-if="pending" class="cards-grid" aria-hidden="true">
-      <UiSkeleton v-for="index in 3" :key="index" height="16rem" radius="md" />
-    </div>
+    <UiSnapCarousel
+      v-if="pending"
+      :items="[1, 2, 3]"
+      :get-key="(item) => item"
+      aria-label="Carregando cartões"
+      aria-hidden="true"
+    >
+      <template #default>
+        <UiSkeleton height="16rem" radius="md" />
+      </template>
+    </UiSnapCarousel>
 
-    <div v-else-if="cards.length" class="cards-grid">
-      <CardsCreditCardTile
-        v-for="card in cards"
-        :key="card.id"
-        :card="card"
-        @edit="openDrawer(card)"
-        @remove="removeCard(card)"
-      />
-    </div>
+    <UiSnapCarousel
+      v-else-if="cards.length"
+      :items="cards"
+      :get-key="(card) => card.id"
+      aria-label="Cartões de crédito"
+      dots-label="Cartões"
+    >
+      <template #default="{ item: card }">
+        <CardsCreditCardTile
+          :card="card"
+          @edit="openDrawer(card)"
+          @remove="removeCard(card)"
+        />
+      </template>
+    </UiSnapCarousel>
 
     <UiCard
       v-if="cards.length || projectionPending"
@@ -274,20 +288,13 @@ async function removeCard(card: Card) {
   font-size: 0.6875rem;
 }
 
-.cards-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-4);
-}
-
 .cards-empty {
   min-height: 18rem;
 }
 
 @media (max-width: 960px) {
   .cards-summary__stats,
-  .cards-insights,
-  .cards-grid {
+  .cards-insights {
     grid-template-columns: 1fr;
   }
 
