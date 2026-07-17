@@ -9,6 +9,7 @@ import {
 } from '@lucide/vue'
 import type { Card } from '~/types/card'
 import type {
+  CardExpenseSaveResult,
   CardExpensePayload,
 } from '~/types/cardExpense'
 import type { CardInvoiceEntry } from '~/types/cardInvoice'
@@ -35,7 +36,7 @@ const props = withDefaults(
   }>(),
   { expense: null, duplicateFrom: null },
 )
-const emit = defineEmits<{ saved: [invoiceMonth?: string] }>()
+const emit = defineEmits<{ saved: [result: CardExpenseSaveResult] }>()
 const open = defineModel<boolean>('open', { required: true })
 
 const { data: categories } = await useFetch<Category[]>('/api/categories', {
@@ -364,8 +365,18 @@ async function save() {
       )
       invoiceMonth = created.invoiceMonth
     }
+    const isInstallment = recurrence.value === 'installment'
     open.value = false
-    emit('saved', invoiceMonth)
+    emit('saved', {
+      invoiceMonth,
+      purchaseDate,
+      amount,
+      commitmentTotal: isInstallment
+        ? roundMoney(amount * installmentCount.value)
+        : amount,
+      isInstallment,
+      isEditing: isEditing.value,
+    })
   } catch (error) {
     errorMessage.value =
       (error as { statusMessage?: string }).statusMessage ??

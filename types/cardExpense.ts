@@ -30,6 +30,15 @@ export interface CardExpenseEditPayload {
   installmentCount: number | null
 }
 
+export interface CardExpenseSaveResult {
+  invoiceMonth?: string
+  purchaseDate: string
+  amount: number
+  commitmentTotal: number
+  isInstallment: boolean
+  isEditing: boolean
+}
+
 export interface CardExpenseOccurrence {
   id: number
   parentId: number

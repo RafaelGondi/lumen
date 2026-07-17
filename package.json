@@ -13,7 +13,8 @@
     "verify:card-cycle": "node verify-card-invoice-cycle.mjs",
     "verify:card-expenses": "node verify-card-expenses.mjs",
     "verify:cash-flow": "node verify-cash-flow.mjs",
-    "verify:date-mask": "node verify-date-mask.mjs"
+    "verify:date-mask": "node verify-date-mask.mjs",
+    "verify:spending-guard": "node verify-spending-guard.mjs"
   },
   "type": "module",
   "dependencies": {

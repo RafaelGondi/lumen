@@ -62,6 +62,11 @@ const {
           :current-balance="selectedMonth.stats.currentBalance"
         />
 
+        <DashboardSpendingGuard
+          class="spending-guard-section"
+          :month="selectedMonth.key"
+        />
+
         <div class="lists-grid">
           <DashboardFinanceListSection
             title="Contas a pagar"
@@ -84,6 +89,10 @@ const {
 </template>
 
 <style scoped>
+.spending-guard-section {
+  margin-top: var(--space-5);
+}
+
 .overview {
   margin-top: var(--space-8);
 }

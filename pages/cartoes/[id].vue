@@ -10,8 +10,10 @@ import {
   Wallet,
 } from '@lucide/vue'
 import type { Card } from '~/types/card'
+import type { CardExpenseSaveResult } from '~/types/cardExpense'
 import type { CardInvoiceDetail } from '~/types/cardInvoice'
 import type { EntrySeriesScope } from '~/types/entry'
+import type { SpendingGuardReport } from '~/types/spendingGuard'
 import { transacaoFaturaMonth } from '~/utils/cardInvoiceCycle'
 import { formatDateBr, roundMoney } from '~/utils/dateMoney'
 import {
@@ -59,6 +61,10 @@ const editingExpense = ref<CardInvoiceDetail['entries'][number] | null>(null)
 const duplicatingExpense = ref<CardInvoiceDetail['entries'][number] | null>(
   null,
 )
+const spendingImpact = ref<{
+  report: SpendingGuardReport
+  purchase: CardExpenseSaveResult
+} | null>(null)
 
 function todayIsoLocal() {
   const today = new Date()
@@ -254,9 +260,24 @@ function goToCurrentMonth() {
   setMonthKey(currentInvoiceMonthKey(card.value.closingDay))
 }
 
-async function onExpenseSaved(invoiceMonth?: string) {
-  if (invoiceMonth) setMonthKey(invoiceMonth)
-  await refreshInvoice()
+async function onExpenseSaved(result: CardExpenseSaveResult) {
+  if (result.invoiceMonth) setMonthKey(result.invoiceMonth)
+  await Promise.all([refreshInvoice(), refreshCard()])
+
+  if (
+    result.isEditing ||
+    result.purchaseDate.slice(0, 7) !== todayIsoLocal().slice(0, 7)
+  ) {
+    return
+  }
+
+  try {
+    const report = await $fetch<SpendingGuardReport>('/api/spending-guard')
+    spendingImpact.value = { report, purchase: result }
+  } catch {
+    // O lançamento já foi salvo; uma falha no resumo não deve afetar o fluxo.
+    spendingImpact.value = null
+  }
 }
 
 function statusTone(status: CardInvoiceDetail['status']) {
@@ -376,6 +397,13 @@ async function onPaymentSaved() {
           Nova despesa
         </UiButton>
       </header>
+
+      <DashboardSpendingImpactNotice
+        v-if="spendingImpact"
+        :report="spendingImpact.report"
+        :purchase="spendingImpact.purchase"
+        @close="spendingImpact = null"
+      />
 
       <section
         class="card-face"

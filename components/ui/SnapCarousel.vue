@@ -6,49 +6,208 @@ const props = withDefaults(
     ariaLabel?: string
     dotsLabel?: string
     columns?: number
+    circular?: boolean
   }>(),
   {
     ariaLabel: 'Lista',
     dotsLabel: 'Itens',
     columns: 3,
+    circular: false,
   },
 )
 
+type DisplaySlide = {
+  item: T
+  realIndex: number
+  slideKey: string | number
+  isClone: boolean
+}
+
+const MOBILE_QUERY = '(max-width: 900px)'
+
 const trackRef = ref<HTMLElement | null>(null)
 const activeIndex = ref(0)
+const isMobileCarousel = ref(false)
+let scrollEndTimer: ReturnType<typeof setTimeout> | null = null
+let suppressScrollSync = false
+
+const circularActive = computed(
+  () => props.circular && props.items.length > 1 && isMobileCarousel.value,
+)
+
+const displaySlides = computed<DisplaySlide[]>(() => {
+  const slides: DisplaySlide[] = props.items.map((item, index) => ({
+    item,
+    realIndex: index,
+    slideKey: props.getKey(item, index),
+    isClone: false,
+  }))
+
+  if (!circularActive.value) return slides
+
+  const lastIndex = props.items.length - 1
+  const last = props.items[lastIndex]!
+  const first = props.items[0]!
+
+  return [
+    {
+      item: last,
+      realIndex: lastIndex,
+      slideKey: `clone-before-${props.getKey(last, lastIndex)}`,
+      isClone: true,
+    },
+    ...slides,
+    {
+      item: first,
+      realIndex: 0,
+      slideKey: `clone-after-${props.getKey(first, 0)}`,
+      isClone: true,
+    },
+  ]
+})
+
+function getStep(track: HTMLElement) {
+  const slide = track.querySelector('.snap-carousel__slide') as HTMLElement | null
+  if (!slide) return 0
+  const gap = Number.parseFloat(getComputedStyle(track).columnGap || '0') || 0
+  return slide.offsetWidth + gap
+}
 
 function syncActiveFromScroll() {
+  if (suppressScrollSync) return
+
   const track = trackRef.value
   if (!track) return
-  const slide = track.querySelector('.snap-carousel__slide') as HTMLElement | null
-  if (!slide) return
-  const gap = Number.parseFloat(getComputedStyle(track).columnGap || '0') || 0
-  const step = slide.offsetWidth + gap
+
+  const step = getStep(track)
   if (step <= 0) return
-  activeIndex.value = Math.min(
-    props.items.length - 1,
+
+  const displayIndex = Math.min(
+    displaySlides.value.length - 1,
     Math.max(0, Math.round(track.scrollLeft / step)),
   )
+  const slide = displaySlides.value[displayIndex]
+  if (slide) activeIndex.value = slide.realIndex
+
+  scheduleScrollEnd()
+}
+
+function scheduleScrollEnd() {
+  if (!circularActive.value) return
+  if (scrollEndTimer) clearTimeout(scrollEndTimer)
+  scrollEndTimer = setTimeout(handleScrollEnd, 120)
+}
+
+function handleScrollEnd() {
+  if (!circularActive.value) return
+
+  const track = trackRef.value
+  if (!track) return
+
+  const step = getStep(track)
+  if (step <= 0) return
+
+  const displayIndex = Math.round(track.scrollLeft / step)
+  const lastDisplayIndex = displaySlides.value.length - 1
+
+  if (displayIndex <= 0) {
+    scrollToDisplayIndex(props.items.length, false)
+    return
+  }
+
+  if (displayIndex >= lastDisplayIndex) {
+    scrollToDisplayIndex(1, false)
+  }
+}
+
+function scrollToDisplayIndex(displayIndex: number, smooth = true) {
+  const track = trackRef.value
+  if (!track) return
+
+  const slide = track.children[displayIndex] as HTMLElement | undefined
+  if (!slide) return
+
+  suppressScrollSync = true
+  track.scrollTo({
+    left: slide.offsetLeft,
+    behavior: smooth ? 'smooth' : 'auto',
+  })
+
+  const slideMeta = displaySlides.value[displayIndex]
+  if (slideMeta) activeIndex.value = slideMeta.realIndex
+
+  if (!smooth) {
+    requestAnimationFrame(() => {
+      suppressScrollSync = false
+    })
+    return
+  }
+
+  window.setTimeout(() => {
+    suppressScrollSync = false
+  }, 350)
 }
 
 function goToSlide(index: number) {
+  if (circularActive.value) {
+    scrollToDisplayIndex(index + 1, true)
+    return
+  }
+
   const track = trackRef.value
   if (!track) return
+
   const slide = track.children[index] as HTMLElement | undefined
   if (!slide) return
+
   track.scrollTo({ left: slide.offsetLeft, behavior: 'smooth' })
   activeIndex.value = index
 }
+
+function initializeScroll() {
+  nextTick(() => {
+    const track = trackRef.value
+    if (!track) return
+
+    if (circularActive.value) {
+      scrollToDisplayIndex(1, false)
+      return
+    }
+
+    track.scrollTo({ left: 0 })
+    activeIndex.value = 0
+  })
+}
+
+function setupMobileQuery() {
+  if (!import.meta.client) return
+
+  const mediaQuery = window.matchMedia(MOBILE_QUERY)
+  const update = () => {
+    isMobileCarousel.value = mediaQuery.matches
+    initializeScroll()
+  }
+
+  update()
+  mediaQuery.addEventListener('change', update)
+
+  onUnmounted(() => {
+    mediaQuery.removeEventListener('change', update)
+    if (scrollEndTimer) clearTimeout(scrollEndTimer)
+  })
+}
+
+onMounted(setupMobileQuery)
 
 watch(
   () => props.items.map((item, index) => props.getKey(item, index)).join('|'),
   () => {
     activeIndex.value = 0
-    nextTick(() => {
-      trackRef.value?.scrollTo({ left: 0 })
-    })
+    initializeScroll()
   },
 )
+
+watch(circularActive, () => initializeScroll())
 </script>
 
 <template>
@@ -63,13 +222,16 @@ watch(
       tabindex="0"
       :aria-label="ariaLabel"
       @scroll.passive="syncActiveFromScroll"
+      @scrollend="handleScrollEnd"
     >
       <div
-        v-for="(item, index) in items"
-        :key="getKey(item, index)"
+        v-for="slide in displaySlides"
+        :key="slide.slideKey"
         class="snap-carousel__slide"
+        :class="{ 'snap-carousel__slide--clone': slide.isClone }"
+        :aria-hidden="slide.isClone || slide.realIndex !== activeIndex"
       >
-        <slot :item="item" :index="index" />
+        <slot :item="slide.item" :index="slide.realIndex" />
       </div>
     </div>
 

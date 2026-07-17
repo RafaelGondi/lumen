@@ -133,6 +133,7 @@ async function removeCard(card: Card) {
       v-if="pending"
       :items="[1, 2, 3]"
       :get-key="(item) => item"
+      circular
       aria-label="Carregando cartões"
       aria-hidden="true"
     >
@@ -145,6 +146,7 @@ async function removeCard(card: Card) {
       v-else-if="cards.length"
       :items="cards"
       :get-key="(card) => card.id"
+      circular
       aria-label="Cartões de crédito"
       dots-label="Cartões"
     >
