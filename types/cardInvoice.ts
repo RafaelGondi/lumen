@@ -36,6 +36,10 @@ export interface CardInvoiceEntry {
   categoryName: string | null
   categoryColor: string | null
   categoryIcon: string | null
+  supercategoryId: number | null
+  supercategoryName: string | null
+  supercategoryColor: string | null
+  supercategoryIcon: string | null
 }
 
 export interface CardInvoiceProjectionMonth {
@@ -87,6 +91,7 @@ export interface CardInvoiceDetail {
   payment: CardInvoicePaymentInfo | null
   projection: CardInvoiceProjectionMonth[]
   categories: CardInvoiceCategorySpend[]
+  supercategories: CardInvoiceCategorySpend[]
   entries: CardInvoiceEntry[]
 }
 

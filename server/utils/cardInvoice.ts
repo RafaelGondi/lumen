@@ -92,22 +92,33 @@ function invoiceEntries(
       categoryName: occurrence.categoryName,
       categoryColor: occurrence.categoryColor,
       categoryIcon: occurrence.categoryIcon,
+      supercategoryId: occurrence.supercategoryId,
+      supercategoryName: occurrence.supercategoryName,
+      supercategoryColor: occurrence.supercategoryColor,
+      supercategoryIcon: occurrence.supercategoryIcon,
     }),
   )
 }
 
-function buildCategories(entries: CardInvoiceEntry[]) {
+function buildSpendGroups(
+  entries: CardInvoiceEntry[],
+  pick: (entry: CardInvoiceEntry) => {
+    id: string
+    name: string
+    color: string
+  },
+): CardInvoiceCategorySpend[] {
   const total = entries.reduce((sum, entry) => sum + entry.amount, 0)
   if (total <= 0) return []
 
   const map = new Map<string, CardInvoiceCategorySpend>()
   for (const entry of entries) {
-    const key = entry.categoryName ?? 'Outros'
-    const current = map.get(key)
-    map.set(key, {
-      id: key,
-      name: key,
-      color: entry.categoryColor ?? '#5d6570',
+    const group = pick(entry)
+    const current = map.get(group.id)
+    map.set(group.id, {
+      id: group.id,
+      name: group.name,
+      color: group.color,
       amount: roundMoney((current?.amount ?? 0) + entry.amount),
       percent: 0,
     })
@@ -118,6 +129,22 @@ function buildCategories(entries: CardInvoiceEntry[]) {
       percent: Math.round((item.amount / total) * 100),
     }))
     .sort((a, b) => b.amount - a.amount)
+}
+
+function buildCategories(entries: CardInvoiceEntry[]) {
+  return buildSpendGroups(entries, (entry) => ({
+    id: entry.categoryName ?? 'Outros',
+    name: entry.categoryName ?? 'Outros',
+    color: entry.categoryColor ?? '#5d6570',
+  }))
+}
+
+function buildSupercategories(entries: CardInvoiceEntry[]) {
+  return buildSpendGroups(entries, (entry) => ({
+    id: entry.supercategoryName ?? 'Sem supercategoria',
+    name: entry.supercategoryName ?? 'Sem supercategoria',
+    color: entry.supercategoryColor ?? '#5d6570',
+  }))
 }
 
 function dueDateInMonth(month: string, dueDay: number) {
@@ -392,6 +419,7 @@ export function buildCardInvoice(
     payment: paymentInfo,
     projection,
     categories: buildCategories(entries),
+    supercategories: buildSupercategories(entries),
     entries,
   }
 }

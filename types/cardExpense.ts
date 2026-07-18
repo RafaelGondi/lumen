@@ -54,6 +54,10 @@ export interface CardExpenseOccurrence {
   categoryName: string | null
   categoryColor: string | null
   categoryIcon: string | null
+  supercategoryId: number | null
+  supercategoryName: string | null
+  supercategoryColor: string | null
+  supercategoryIcon: string | null
   statementName: string | null
   notes: string | null
   recurrence: EntryRecurrence

@@ -13,6 +13,10 @@ type CardExpenseParent = {
   categoryName: string | null
   categoryColor: string | null
   categoryIcon: string | null
+  supercategoryId: number | null
+  supercategoryName: string | null
+  supercategoryColor: string | null
+  supercategoryIcon: string | null
   description: string
   amount: number
   statementName: string | null
@@ -41,6 +45,10 @@ type CategoryMeta = {
   name: string
   color: string
   icon: string
+  supercategoryId: number | null
+  supercategoryName: string | null
+  supercategoryColor: string | null
+  supercategoryIcon: string | null
 }
 
 function monthIndex(month: string) {
@@ -62,6 +70,10 @@ function loadParents(db: Database.Database, cardId: number) {
          c.name AS categoryName,
          c.color AS categoryColor,
          c.icon AS categoryIcon,
+         s.id AS supercategoryId,
+         s.name AS supercategoryName,
+         s.color AS supercategoryColor,
+         s.icon AS supercategoryIcon,
          e.description,
          e.amount,
          e.statement_name AS statementName,
@@ -73,6 +85,7 @@ function loadParents(db: Database.Database, cardId: number) {
          e.month_end AS useMonthEnd
        FROM entries e
        LEFT JOIN categories c ON c.id = e.category_id
+       LEFT JOIN supercategories s ON s.id = c.supercategory_id
        WHERE e.card_id = ?
          AND e.account_id IS NULL
          AND e.type = 'expense'`,
@@ -107,9 +120,18 @@ function loadExceptions(db: Database.Database, entryIds: number[]) {
 function loadCategories(db: Database.Database) {
   const rows = db
     .prepare(
-      `SELECT id, name, color, icon
-       FROM categories
-       WHERE type = 'expense'`,
+      `SELECT
+         c.id,
+         c.name,
+         c.color,
+         c.icon,
+         s.id AS supercategoryId,
+         s.name AS supercategoryName,
+         s.color AS supercategoryColor,
+         s.icon AS supercategoryIcon
+       FROM categories c
+       LEFT JOIN supercategories s ON s.id = c.supercategory_id
+       WHERE c.type = 'expense'`,
     )
     .all() as CategoryMeta[]
   return new Map(rows.map((row) => [row.id, row]))
@@ -155,6 +177,20 @@ function deriveOccurrence(
     categoryId === parent.categoryId
       ? null
       : categories.get(categoryId ?? -1)
+  const supercategory =
+    categoryId === parent.categoryId
+      ? {
+          supercategoryId: parent.supercategoryId,
+          supercategoryName: parent.supercategoryName,
+          supercategoryColor: parent.supercategoryColor,
+          supercategoryIcon: parent.supercategoryIcon,
+        }
+      : {
+          supercategoryId: overriddenCategory?.supercategoryId ?? null,
+          supercategoryName: overriddenCategory?.supercategoryName ?? null,
+          supercategoryColor: overriddenCategory?.supercategoryColor ?? null,
+          supercategoryIcon: overriddenCategory?.supercategoryIcon ?? null,
+        }
 
   return {
     id: parent.id,
@@ -191,6 +227,10 @@ function deriveOccurrence(
       categoryId === parent.categoryId
         ? parent.categoryIcon
         : overriddenCategory?.icon ?? null,
+    supercategoryId: supercategory.supercategoryId,
+    supercategoryName: supercategory.supercategoryName,
+    supercategoryColor: supercategory.supercategoryColor,
+    supercategoryIcon: supercategory.supercategoryIcon,
     statementName: isEdit ? exception.statementName : parent.statementName,
     notes: isEdit ? exception.notes : parent.notes,
     recurrence: parent.recurrence,

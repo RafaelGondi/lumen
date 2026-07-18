@@ -65,6 +65,12 @@ const spendingImpact = ref<{
   report: SpendingGuardReport
   purchase: CardExpenseSaveResult
 } | null>(null)
+const spendGroupBy = ref<'category' | 'supercategory'>('category')
+
+const spendGroupOptions = [
+  { value: 'category' as const, label: 'Categoria' },
+  { value: 'supercategory' as const, label: 'Supercategoria' },
+]
 
 function todayIsoLocal() {
   const today = new Date()
@@ -155,44 +161,15 @@ const projectionTotal = computed(() =>
   ),
 )
 
-const categoryGradient = computed(() => {
-  const categories = invoice.value?.categories ?? []
-  if (!categories.length) return 'conic-gradient(var(--color-border) 0 100%)'
+const activeSpendGroups = computed(() =>
+  spendGroupBy.value === 'supercategory'
+    ? (invoice.value?.supercategories ?? [])
+    : (invoice.value?.categories ?? []),
+)
 
-  let cursor = 0
-  const stops: string[] = []
-  for (const category of categories) {
-    const next = cursor + category.percent
-    stops.push(`${category.color} ${cursor}% ${next}%`)
-    cursor = next
-  }
-  if (cursor < 100) {
-    stops.push(`var(--color-border) ${cursor}% 100%`)
-  }
-  return `conic-gradient(${stops.join(', ')})`
-})
-
-const CATEGORY_VISIBLE_LIMIT = 6
-
-const visibleCategories = computed(() => {
-  const categories = invoice.value?.categories ?? []
-  if (categories.length <= CATEGORY_VISIBLE_LIMIT) return categories
-
-  const head = categories.slice(0, CATEGORY_VISIBLE_LIMIT - 1)
-  const rest = categories.slice(CATEGORY_VISIBLE_LIMIT - 1)
-  const amount = roundMoney(rest.reduce((sum, item) => sum + item.amount, 0))
-  const percent = rest.reduce((sum, item) => sum + item.percent, 0)
-  return [
-    ...head,
-    {
-      id: '__others__',
-      name: `+${rest.length} categorias`,
-      color: '#9aa3af',
-      amount,
-      percent,
-    },
-  ]
-})
+const activeSpendOthersLabel = computed(() =>
+  spendGroupBy.value === 'supercategory' ? 'supercategorias' : 'categorias',
+)
 
 const filteredBase = computed(() => {
   const entries = invoice.value?.entries ?? []
@@ -207,6 +184,7 @@ const filteredBase = computed(() => {
     return (
       entry.description.toLowerCase().includes(term) ||
       (entry.categoryName?.toLowerCase().includes(term) ?? false) ||
+      (entry.supercategoryName?.toLowerCase().includes(term) ?? false) ||
       (entry.notes?.toLowerCase().includes(term) ?? false) ||
       amount.includes(term)
     )
@@ -580,40 +558,22 @@ async function onPaymentSaved() {
 
       <UiCard class="card-categories">
         <div class="card-categories__heading">
-          <h2>Gastos por categoria</h2>
-          <p>{{ invoice?.monthLabel ?? monthLabel }}</p>
+          <div>
+            <h2>Composição dos gastos</h2>
+            <p>{{ invoice?.monthLabel ?? monthLabel }}</p>
+          </div>
+          <UiSegmentedControl
+            v-model="spendGroupBy"
+            :options="spendGroupOptions"
+            aria-label="Agrupar gastos"
+          />
         </div>
 
-        <div
-          v-if="invoice?.categories.length"
-          class="card-categories__body"
-        >
-          <div
-            class="card-categories__donut"
-            :style="{ background: categoryGradient }"
-            aria-hidden="true"
-          >
-            <span />
-          </div>
-          <ul>
-            <li
-              v-for="category in visibleCategories"
-              :key="category.id"
-            >
-              <span
-                class="card-categories__dot"
-                :style="{ background: category.color }"
-              />
-              <strong>{{ category.name }}</strong>
-              <div class="card-categories__values">
-                <span class="numeric"
-                  ><UiMoney :value="category.amount"
-                /></span>
-                <span>{{ category.percent }}%</span>
-              </div>
-            </li>
-          </ul>
-        </div>
+        <CardsInvoiceSpendDonut
+          v-if="activeSpendGroups.length"
+          :items="activeSpendGroups"
+          :others-label="activeSpendOthersLabel"
+        />
 
         <UiEmptyState
           v-else
@@ -1080,82 +1040,12 @@ async function onPaymentSaved() {
 }
 
 .card-categories__heading {
-  margin-bottom: var(--space-3);
-}
-
-.card-categories__body {
-  display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr);
-  gap: var(--space-5);
-  align-items: center;
-}
-
-.card-categories__donut {
-  position: relative;
-  width: 5.5rem;
-  height: 5.5rem;
-  border-radius: 50%;
-}
-
-.card-categories__donut span {
-  position: absolute;
-  inset: 1.1rem;
-  border-radius: 50%;
-  background: var(--color-surface);
-}
-
-.card-categories__body ul {
   display: flex;
-  margin: 0;
-  padding: 0;
-  flex-direction: column;
-  gap: 0.55rem;
-  list-style: none;
-}
-
-.card-categories__body li {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: var(--space-3);
-}
-
-.card-categories__dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.card-categories__body strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.card-categories__values {
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  white-space: nowrap;
-}
-
-.card-categories__values span:first-child {
-  color: var(--color-ink);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-}
-
-.card-categories__values span:last-child {
-  min-width: 2.25rem;
-  color: var(--color-ink-muted);
-  font-size: var(--text-xs);
-  text-align: right;
+  margin-bottom: var(--space-4);
 }
 
 .card-entries__header,
@@ -1302,8 +1192,7 @@ async function onPaymentSaved() {
 }
 
 @media (max-width: 860px) {
-  .card-insights,
-  .card-categories__body {
+  .card-insights {
     grid-template-columns: 1fr;
   }
 
