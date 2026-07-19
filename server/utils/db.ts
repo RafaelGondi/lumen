@@ -428,6 +428,63 @@ function migrate(database: Database.Database) {
   migrateExpandedSeries(database)
   migrateCardInvoiceAdjustments(database)
   migrateCardInvoicePayments(database)
+  migrateSpendingLimits(database)
+}
+
+function migrateSpendingLimits(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS spending_limit_global (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind TEXT NOT NULL CHECK (kind IN ('fixed', 'percentage')),
+      value REAL NOT NULL CHECK (value > 0),
+      effective_from TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS spending_limits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      scope TEXT NOT NULL CHECK (scope IN ('category', 'supercategory')),
+      reference_id INTEGER NOT NULL,
+      month TEXT NOT NULL,
+      amount REAL NOT NULL CHECK (amount > 0),
+      recurring INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      UNIQUE (scope, reference_id, month)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_spending_limits_scope_month
+      ON spending_limits (scope, month);
+  `)
+
+  const hasDefault = database
+    .prepare('SELECT 1 FROM spending_limit_global LIMIT 1')
+    .get()
+
+  if (!hasDefault) {
+    database
+      .prepare(
+        `INSERT INTO spending_limit_global (kind, value, effective_from, created_at)
+         VALUES ('percentage', 25, '2020-01', ?)`,
+      )
+      .run(todayLocal())
+  }
+
+  database.exec(`
+    UPDATE categories
+    SET supercategory_id = (
+      SELECT s.id
+      FROM supercategories s
+      WHERE lower(trim(s.name)) = lower(trim(categories.name))
+      LIMIT 1
+    )
+    WHERE type = 'expense'
+      AND supercategory_id IS NULL
+      AND EXISTS (
+        SELECT 1
+        FROM supercategories s
+        WHERE lower(trim(s.name)) = lower(trim(categories.name))
+      );
+  `)
 }
 
 function migrateCardInvoiceAdjustments(database: Database.Database) {

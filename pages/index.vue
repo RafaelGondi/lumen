@@ -62,11 +62,6 @@ const {
           :current-balance="selectedMonth.stats.currentBalance"
         />
 
-        <DashboardSpendingGuard
-          class="spending-guard-section"
-          :month="selectedMonth.key"
-        />
-
         <div class="lists-grid">
           <DashboardFinanceListSection
             title="Contas a pagar"
@@ -83,18 +78,37 @@ const {
             empty-description="Registre receitas para vê-las aqui."
           />
         </div>
+
+        <DashboardSpendingGuard
+          class="spending-guard-section"
+          :month="selectedMonth.key"
+        />
+
+        <DashboardLimitsOverview
+          class="limits-overview-section"
+          :month="selectedMonth.key"
+        />
       </div>
     </section>
   </div>
 </template>
 
 <style scoped>
-.spending-guard-section {
-  margin-top: var(--space-5);
-}
-
 .overview {
   margin-top: var(--space-8);
+}
+
+.lists-grid {
+  display: grid;
+  margin-top: var(--space-5);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: var(--space-4);
+}
+
+.spending-guard-section,
+.limits-overview-section {
+  margin-top: var(--space-5);
 }
 
 .overview__heading {
@@ -129,14 +143,6 @@ const {
   height: 0.4rem;
   border-radius: 50%;
   background: var(--color-positive);
-}
-
-.lists-grid {
-  display: grid;
-  margin-top: var(--space-5);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: stretch;
-  gap: var(--space-4);
 }
 
 .dashboard-content {

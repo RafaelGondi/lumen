@@ -1,15 +1,33 @@
 import type Database from 'better-sqlite3'
 import type {
+  SpendingGuardBreakdownGroup,
+  SpendingGuardBreakdownItem,
+  SpendingGuardCardDeferred,
   SpendingGuardPace,
   SpendingGuardReport,
   SpendingGuardStatus,
 } from '~/types/spendingGuard'
+import type { SpendingCalendarItem } from '~/types/spendingCalendar'
+import { transacaoFaturaMonth } from '~/utils/cardInvoiceCycle'
 import { roundMoney } from '~/utils/dateMoney'
 import { occurrencesForCashMonth } from './occurrences'
 import { buildSpendingCalendar } from './spendingCalendar'
+import { resolveGlobalSpendingSettings } from './limits'
 
-const SAVINGS_TARGET_PERCENT = 25
-const SPENDING_LIMIT_PERCENT = 100 - SAVINGS_TARGET_PERCENT
+const MONTH_SHORT = [
+  'Jan',
+  'Fev',
+  'Mar',
+  'Abr',
+  'Mai',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Set',
+  'Out',
+  'Nov',
+  'Dez',
+]
 
 function roundPercent(value: number) {
   return Math.round(value * 10) / 10
@@ -67,6 +85,115 @@ function totalsBySource(
   )
 }
 
+function shortMonthLabel(month: string) {
+  const [year, value] = month.split('-').map(Number)
+  return `${MONTH_SHORT[value! - 1]}/${year}`
+}
+
+function loadCardClosingDays(db: Database.Database) {
+  const rows = db
+    .prepare(
+      `SELECT id, closing_day AS closingDay
+       FROM cards
+       WHERE active = 1`,
+    )
+    .all() as { id: number; closingDay: number }[]
+  return new Map(rows.map((row) => [row.id, row.closingDay]))
+}
+
+function buildCardDeferred(
+  items: SpendingCalendarItem[],
+  month: string,
+  closingDays: Map<number, number>,
+): SpendingGuardCardDeferred {
+  const byInvoiceMonth = new Map<string, number>()
+
+  for (const item of items) {
+    if (item.source !== 'card' || !item.cardId) continue
+    const closingDay = closingDays.get(item.cardId)
+    if (closingDay === undefined) continue
+
+    const invoiceMonth = transacaoFaturaMonth(item.date, closingDay)
+    if (invoiceMonth === month) continue
+
+    byInvoiceMonth.set(
+      invoiceMonth,
+      roundMoney((byInvoiceMonth.get(invoiceMonth) ?? 0) + item.amount),
+    )
+  }
+
+  let invoiceMonthLabel: string | null = null
+  let amount = 0
+  for (const [invoiceMonth, value] of byInvoiceMonth) {
+    if (value > amount) {
+      amount = value
+      invoiceMonthLabel = shortMonthLabel(invoiceMonth)
+    }
+  }
+
+  return { amount, invoiceMonthLabel }
+}
+
+function buildBreakdownGroups(
+  items: SpendingCalendarItem[],
+  month: string,
+  closingDays: Map<number, number>,
+): SpendingGuardBreakdownGroup[] {
+  const groups = new Map<string, SpendingGuardBreakdownGroup>()
+
+  for (const item of items) {
+    const key = item.categoryId != null ? String(item.categoryId) : 'none'
+    let group = groups.get(key)
+    if (!group) {
+      group = {
+        key,
+        label: item.categoryName ?? 'Sem categoria',
+        color: item.categoryColor,
+        icon: item.categoryIcon,
+        total: 0,
+        items: [],
+      }
+      groups.set(key, group)
+    }
+
+    let invoiceMonthLabel: string | null = null
+    if (item.source === 'card' && item.cardId) {
+      const closingDay = closingDays.get(item.cardId)
+      if (closingDay !== undefined) {
+        const invoiceMonth = transacaoFaturaMonth(item.date, closingDay)
+        if (invoiceMonth !== month) {
+          invoiceMonthLabel = shortMonthLabel(invoiceMonth)
+        }
+      }
+    }
+
+    const breakdownItem: SpendingGuardBreakdownItem = {
+      id: item.id,
+      description: item.description,
+      amount: item.amount,
+      date: item.date,
+      source: item.source,
+      sourceLabel:
+        item.source === 'card' ? item.cardName : item.accountName,
+      categoryName: item.categoryName,
+      categoryColor: item.categoryColor,
+      categoryIcon: item.categoryIcon,
+      invoiceMonthLabel,
+    }
+
+    group.items.push(breakdownItem)
+    group.total = roundMoney(group.total + item.amount)
+  }
+
+  for (const group of groups.values()) {
+    group.items.sort(
+      (a, b) => b.date.localeCompare(a.date) || b.amount - a.amount,
+    )
+  }
+
+  return [...groups.values()].sort((a, b) => b.total - a.total)
+}
+
 export function buildSpendingGuard(
   db: Database.Database,
   month = todayLocal().slice(0, 7),
@@ -90,6 +217,7 @@ export function buildSpendingGuard(
     month < currentMonth ? 'past' : month > currentMonth ? 'future' : 'current'
   const calendar = buildSpendingCalendar(db, month, 'all')
   const paymentEntryIds = invoicePaymentEntryIds(db)
+  const closingDays = loadCardClosingDays(db)
   const items = calendar.days
     .flatMap((day) => day.items)
     .filter(
@@ -114,12 +242,13 @@ export function buildSpendingGuard(
       .filter((occurrence) => occurrence.type === 'income')
       .reduce((sum, occurrence) => sum + occurrence.amount, 0),
   )
-  const savingsGoal = roundMoney(
-    expectedIncome * (SAVINGS_TARGET_PERCENT / 100),
+  const globalSettings = resolveGlobalSpendingSettings(
+    db,
+    month,
+    expectedIncome,
   )
-  const spendingLimit = roundMoney(
-    expectedIncome * (SPENDING_LIMIT_PERCENT / 100),
-  )
+  const savingsGoal = globalSettings.savingsGoal
+  const spendingLimit = globalSettings.spendingLimit
   const spentToDate = roundMoney(
     spentItems.reduce((sum, item) => sum + item.amount, 0),
   )
@@ -157,6 +286,31 @@ export function buildSpendingGuard(
 
   const sourceTotals = totalsBySource(spentItems)
   const committedSourceTotals = totalsBySource(items)
+  const cardDeferred = buildCardDeferred(spentItems, month, closingDays)
+  const spentBreakdown = buildBreakdownGroups(
+    spentItems,
+    month,
+    closingDays,
+  )
+  const futureBreakdown = buildBreakdownGroups(
+    futureItems,
+    month,
+    closingDays,
+  )
+  const spentOfIncomePercent =
+    expectedIncome > 0
+      ? roundPercent((spentToDate / expectedIncome) * 100)
+      : 0
+  const limitOfIncomePercent =
+    expectedIncome > 0
+      ? roundPercent((spendingLimit / expectedIncome) * 100)
+      : 0
+  const actualSavingsPercent =
+    expectedIncome > 0
+      ? roundPercent(
+          ((expectedIncome - spentToDate) / expectedIncome) * 100,
+        )
+      : null
 
   return {
     month,
@@ -171,8 +325,8 @@ export function buildSpendingGuard(
     day,
     daysInMonth,
     daysRemaining,
-    savingsTargetPercent: SAVINGS_TARGET_PERCENT,
-    spendingLimitPercent: SPENDING_LIMIT_PERCENT,
+    savingsTargetPercent: globalSettings.savingsTargetPercent,
+    spendingLimitPercent: globalSettings.spendingLimitPercent,
     expectedIncome,
     savingsGoal,
     spendingLimit,
@@ -183,8 +337,14 @@ export function buildSpendingGuard(
     availableAfterCommitments,
     dailyAvailable:
       daysRemaining > 0
-        ? roundMoney(Math.max(0, availableAfterCommitments) / daysRemaining)
-        : Math.max(0, availableAfterCommitments),
+        ? roundMoney(Math.max(0, remainingToLimit) / daysRemaining)
+        : Math.max(0, remainingToLimit),
+    spentOfIncomePercent,
+    limitOfIncomePercent,
+    actualSavingsPercent,
+    cardDeferred,
+    spentBreakdown,
+    futureBreakdown,
     spentPercent,
     committedPercent,
     elapsedPercent,

@@ -19,6 +19,10 @@ function round(value) {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
+function roundPercent(value) {
+  return Math.round(value * 10) / 10
+}
+
 const guard = await api('/api/spending-guard')
 const calendar = await api(`/api/calendar?month=${guard.month}`)
 const dashboard = await api(`/api/dashboard?month=${guard.month}`)
@@ -79,6 +83,65 @@ assert(
   'pagamento de fatura contado como gasto novamente',
 )
 
+assert(
+  guard.limitOfIncomePercent === 75 || guard.expectedIncome === 0,
+  'limite deve ser 75% da receita',
+)
+assert(
+  guard.spentOfIncomePercent ===
+    (guard.expectedIncome > 0
+      ? roundPercent((guard.spentToDate / guard.expectedIncome) * 100)
+      : 0),
+  'spentOfIncomePercent inválido',
+)
+assert(
+  guard.actualSavingsPercent ===
+    (guard.expectedIncome > 0
+      ? roundPercent(
+          ((guard.expectedIncome - guard.spentToDate) / guard.expectedIncome) *
+            100,
+        )
+      : null),
+  'actualSavingsPercent inválido',
+)
+assert(
+  guard.dailyAvailable ===
+    (guard.daysRemaining > 0
+      ? round(Math.max(0, guard.remainingToLimit) / guard.daysRemaining)
+      : 0),
+  'dailyAvailable inválido',
+)
+assert(
+  typeof guard.cardDeferred?.amount === 'number',
+  'cardDeferred.amount ausente',
+)
+assert(
+  guard.cardDeferred.amount >= 0,
+  'cardDeferred.amount negativo',
+)
+assert(
+  guard.cardDeferred.amount <= guard.sourceTotals.card,
+  'cardDeferred maior que gasto no cartão',
+)
+
+function breakdownTotal(groups) {
+  return round(
+    groups.reduce(
+      (sum, group) => sum + group.items.reduce((s, item) => s + item.amount, 0),
+      0,
+    ),
+  )
+}
+
+assert(
+  breakdownTotal(guard.spentBreakdown) === guard.spentToDate,
+  'spentBreakdown divergiu do gasto até hoje',
+)
+assert(
+  breakdownTotal(guard.futureBreakdown) === guard.futureCommitted,
+  'futureBreakdown divergiu dos compromissos futuros',
+)
+
 console.log(
   JSON.stringify(
     {
@@ -91,6 +154,10 @@ console.log(
       status: guard.status,
       account: guard.sourceTotals.account,
       card: guard.sourceTotals.card,
+      cardDeferred: guard.cardDeferred,
+      spentOfIncomePercent: guard.spentOfIncomePercent,
+      actualSavingsPercent: guard.actualSavingsPercent,
+      dailyAvailable: guard.dailyAvailable,
       excludedInvoicePayments: paymentIds.size,
     },
     null,

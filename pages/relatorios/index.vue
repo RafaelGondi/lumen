@@ -194,7 +194,7 @@ function movementMeta(movement: CashFlowMovement) {
       </template>
     </PageHeading>
 
-    <p class="reports-page__tab">Fluxo de Caixa</p>
+    <ReportsReportTabs />
 
     <div v-if="error" class="reports-page__error">
       <UiEmptyState
@@ -365,19 +365,6 @@ function movementMeta(movement: CashFlowMovement) {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
-
-.reports-page__tab {
-  display: inline-flex;
-  align-self: flex-start;
-  padding: 0.45rem 0.8rem;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  box-shadow: var(--shadow-xs);
 }
 
 .reports-page__gap {
