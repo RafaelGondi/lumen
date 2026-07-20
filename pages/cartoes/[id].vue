@@ -238,6 +238,10 @@ function goToCurrentMonth() {
   setMonthKey(currentInvoiceMonthKey(card.value.closingDay))
 }
 
+function selectMonth({ year, month }: { year: number; month: number }) {
+  setMonthKey(`${year}-${String(month).padStart(2, '0')}`)
+}
+
 async function onExpenseSaved(result: CardExpenseSaveResult) {
   if (result.invoiceMonth) setMonthKey(result.invoiceMonth)
   await Promise.all([refreshInvoice(), refreshCard()])
@@ -444,12 +448,15 @@ async function onPaymentSaved() {
         <div class="card-month-nav">
           <UiMonthSwitcher
             :label="monthLabel"
+            :year="selectedYear"
+            :month="selectedMonth"
             :can-go-previous="true"
             :can-go-next="true"
             :is-current="isCurrentMonth"
             @previous="shiftMonth(-1)"
             @next="shiftMonth(1)"
             @current="goToCurrentMonth"
+            @select="selectMonth"
           />
         </div>
 

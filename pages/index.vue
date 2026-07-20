@@ -8,12 +8,16 @@ import {
 
 const {
   selectedMonth,
+  selectedYear,
+  selectedMonthNumber,
+  maxMonthKey,
   isLoading,
   canGoPrevious,
   canGoNext,
   isCurrentMonth,
   changeMonth,
   goToCurrentMonth,
+  selectMonth,
 } = useFinanceDashboard()
 </script>
 
@@ -27,12 +31,16 @@ const {
       <template #actions>
         <UiMonthSwitcher
           :label="selectedMonth?.fullLabel ?? 'Carregando…'"
+          :year="selectedYear"
+          :month="selectedMonthNumber"
+          :max-month-key="maxMonthKey"
           :can-go-previous="canGoPrevious"
           :can-go-next="canGoNext"
           :is-current="isCurrentMonth"
           @previous="changeMonth(-1)"
           @next="changeMonth(1)"
           @current="goToCurrentMonth"
+          @select="selectMonth"
         />
       </template>
     </PageHeading>

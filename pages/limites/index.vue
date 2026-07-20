@@ -92,6 +92,11 @@ function goToCurrentMonth() {
   selectedMonth.value = today.getMonth() + 1
 }
 
+function selectMonth({ year, month }: { year: number; month: number }) {
+  selectedYear.value = year
+  selectedMonth.value = month
+}
+
 function openDrawer(row: LimitRow) {
   editingRow.value = row
   drawerOpen.value = true
@@ -117,12 +122,15 @@ function rowPercent(row: LimitRow) {
       <template #actions>
         <UiMonthSwitcher
           :label="monthLabel"
+          :year="selectedYear"
+          :month="selectedMonth"
           :can-go-previous="true"
           :can-go-next="true"
           :is-current="isCurrentMonth"
           @previous="shiftMonth(-1)"
           @next="shiftMonth(1)"
           @current="goToCurrentMonth"
+          @select="selectMonth"
         />
       </template>
     </PageHeading>

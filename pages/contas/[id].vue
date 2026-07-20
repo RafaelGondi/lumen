@@ -194,6 +194,11 @@ function goToCurrentMonth() {
   selectedMonth.value = now.getMonth() + 1
 }
 
+function selectMonth({ year, month }: { year: number; month: number }) {
+  selectedYear.value = year
+  selectedMonth.value = month
+}
+
 async function refreshAll() {
   await Promise.all([refreshAccount(), refreshEntries()])
 }
@@ -395,12 +400,15 @@ function entryMeta(entry: EntryOccurrence) {
       <div class="account-month__nav">
         <UiMonthSwitcher
           :label="monthLabel"
+          :year="selectedYear"
+          :month="selectedMonth"
           :can-go-previous="true"
           :can-go-next="true"
           :is-current="isCurrentMonth"
           @previous="shiftMonth(-1)"
           @next="shiftMonth(1)"
           @current="goToCurrentMonth"
+          @select="selectMonth"
         />
       </div>
 

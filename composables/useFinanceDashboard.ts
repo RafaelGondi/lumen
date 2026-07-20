@@ -43,14 +43,32 @@ export function useFinanceDashboard() {
     selectedMonthKey.value = currentMonthKey()
   }
 
+  function selectMonth({ year, month }: { year: number; month: number }) {
+    const key = `${year}-${String(month).padStart(2, '0')}`
+    const max = shiftMonthKey(currentMonthKey(), 12)
+    selectedMonthKey.value = key > max ? max : key
+  }
+
+  const selectedYear = computed(() =>
+    Number(selectedMonthKey.value.split('-')[0]),
+  )
+  const selectedMonthNumber = computed(() =>
+    Number(selectedMonthKey.value.split('-')[1]),
+  )
+  const maxMonthKey = computed(() => shiftMonthKey(currentMonthKey(), 12))
+
   return {
     selectedMonth,
+    selectedYear,
+    selectedMonthNumber,
+    maxMonthKey,
     isLoading: readonly(isLoading),
     canGoPrevious,
     canGoNext,
     isCurrentMonth,
     changeMonth,
     goToCurrentMonth,
+    selectMonth,
     refresh,
   }
 }
