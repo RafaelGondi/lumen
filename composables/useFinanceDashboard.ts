@@ -24,19 +24,14 @@ export function useFinanceDashboard() {
   })
 
   const canGoPrevious = computed(() => true)
-  const canGoNext = computed(() => {
-    const max = shiftMonthKey(currentMonthKey(), 12)
-    return selectedMonthKey.value < max
-  })
+  const canGoNext = computed(() => true)
 
   const isCurrentMonth = computed(
     () => selectedMonthKey.value === currentMonthKey(),
   )
 
   function changeMonth(direction: -1 | 1) {
-    const next = shiftMonthKey(selectedMonthKey.value, direction)
-    if (direction === 1 && next > shiftMonthKey(currentMonthKey(), 12)) return
-    selectedMonthKey.value = next
+    selectedMonthKey.value = shiftMonthKey(selectedMonthKey.value, direction)
   }
 
   function goToCurrentMonth() {
@@ -44,9 +39,7 @@ export function useFinanceDashboard() {
   }
 
   function selectMonth({ year, month }: { year: number; month: number }) {
-    const key = `${year}-${String(month).padStart(2, '0')}`
-    const max = shiftMonthKey(currentMonthKey(), 12)
-    selectedMonthKey.value = key > max ? max : key
+    selectedMonthKey.value = `${year}-${String(month).padStart(2, '0')}`
   }
 
   const selectedYear = computed(() =>
@@ -55,13 +48,11 @@ export function useFinanceDashboard() {
   const selectedMonthNumber = computed(() =>
     Number(selectedMonthKey.value.split('-')[1]),
   )
-  const maxMonthKey = computed(() => shiftMonthKey(currentMonthKey(), 12))
 
   return {
     selectedMonth,
     selectedYear,
     selectedMonthNumber,
-    maxMonthKey,
     isLoading: readonly(isLoading),
     canGoPrevious,
     canGoNext,
