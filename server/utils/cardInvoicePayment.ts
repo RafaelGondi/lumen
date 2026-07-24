@@ -83,22 +83,27 @@ export function loadCardInvoicePaymentsMap(
   )
 }
 
-/** Conjunto de chaves `cardId:YYYY-MM` pagas. */
-export function loadPaidInvoiceKeys(
+/** Mapa `cardId:YYYY-MM` → valor pago. */
+export function loadPaidTotalsForCards(
   db: Database.Database,
   cardIds: number[],
-): Set<string> {
-  if (!cardIds.length) return new Set()
+): Map<string, number> {
+  if (!cardIds.length) return new Map()
   const placeholders = cardIds.map(() => '?').join(', ')
   const rows = db
     .prepare(
-      `SELECT card_id AS cardId, invoice_month AS invoiceMonth
+      `SELECT card_id AS cardId, invoice_month AS invoiceMonth, total_paid AS totalPaid
        FROM card_invoice_payments
        WHERE card_id IN (${placeholders})`,
     )
-    .all(...cardIds) as { cardId: number; invoiceMonth: string }[]
+    .all(...cardIds) as { cardId: number; invoiceMonth: string; totalPaid: number }[]
 
-  return new Set(rows.map((row) => `${row.cardId}:${row.invoiceMonth}`))
+  return new Map(
+    rows.map((row) => [
+      `${row.cardId}:${row.invoiceMonth}`,
+      roundMoney(row.totalPaid),
+    ]),
+  )
 }
 
 export function insertCardInvoicePayment(

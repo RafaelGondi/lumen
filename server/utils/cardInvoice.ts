@@ -17,7 +17,7 @@ import {
 import {
   loadCardInvoicePayment,
   loadCardInvoicePaymentsMap,
-  loadPaidInvoiceKeys,
+  loadPaidTotalsForCards,
 } from './cardInvoicePayment'
 
 const MONTH_SHORT = [
@@ -173,7 +173,8 @@ function invoiceMonthAmount(
   adjustments: Map<string, number>,
   payments: Map<string, { totalPaid: number }>,
 ) {
-  if (payments.has(month)) return 0
+  const payment = payments.get(month)
+  if (payment) return payment.totalPaid
   const entriesSubtotal = invoiceEntries(db, card, month).reduce(
     (sum, entry) => sum + entry.amount,
     0,
@@ -284,7 +285,7 @@ export function buildConsolidatedCardsProjection(
     db,
     mapped.map((card) => card.id),
   )
-  const paidKeys = loadPaidInvoiceKeys(
+  const paidTotals = loadPaidTotalsForCards(
     db,
     mapped.map((card) => card.id),
   )
@@ -293,7 +294,8 @@ export function buildConsolidatedCardsProjection(
     const month = shiftMonth(fromMonth, index)
     const amount = roundMoney(
       mapped.reduce((sum, card) => {
-        if (paidKeys.has(`${card.id}:${month}`)) return sum
+        const paidTotal = paidTotals.get(`${card.id}:${month}`)
+        if (paidTotal !== undefined) return sum + paidTotal
         const entriesSubtotal = invoiceEntries(db, card, month).reduce(
           (entrySum, entry) => entrySum + entry.amount,
           0,
