@@ -117,7 +117,10 @@ const kpiCards = computed(() => {
     label: 'Pior saldo',
     value: report.value.worstBalance,
     support: `Dia ${report.value.worstDay}`,
-    tone: report.value.worstBalance >= 0 ? 'positive' : 'negative',
+    tone:
+      report.value.days.some((d) => d.isCritical) || report.value.worstBalance < 0
+        ? 'negative'
+        : 'positive',
   })
 
   cards.push({
@@ -255,6 +258,7 @@ function movementMeta(movement: CashFlowMovement) {
           v-else-if="report"
           :days="report.days"
           :selected-date="selectedDate"
+          :critical-threshold="report.criticalThreshold"
           @select="selectedDate = $event"
         />
       </UiCard>
@@ -262,7 +266,12 @@ function movementMeta(movement: CashFlowMovement) {
       <div class="reports-bottom">
         <UiCard class="reports-critical">
           <div class="reports-critical__heading">
-            <h2>Dias críticos</h2>
+            <h2>
+              Dias críticos
+              <span v-if="criticalDays.length" class="reports-critical__count">
+                {{ criticalDays.length }}
+              </span>
+            </h2>
             <p>
               Dias em que o saldo fica negativo ou cai abaixo de
               {{ formatMoney(report?.criticalThreshold ?? 500) }}
@@ -420,6 +429,19 @@ function movementMeta(movement: CashFlowMovement) {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   gap: var(--space-4);
+}
+
+.reports-critical__count {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--space-2);
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-negative-soft);
+  color: var(--color-negative-ink);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  vertical-align: middle;
 }
 
 .reports-critical__heading h2,

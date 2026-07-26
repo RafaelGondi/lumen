@@ -4,6 +4,7 @@ import type { CashFlowDay } from '~/types/cashFlow'
 const props = defineProps<{
   days: CashFlowDay[]
   selectedDate: string | null
+  criticalThreshold?: number
 }>()
 
 const emit = defineEmits<{
@@ -137,6 +138,13 @@ const zeroLineY = computed(() => {
   return yFor(0)
 })
 
+const hasCriticalDays = computed(() => props.days.some((day) => day.isCritical))
+
+const criticalClipY = computed(() => {
+  const threshold = props.criticalThreshold ?? 500
+  return yFor(threshold)
+})
+
 const todayIndex = computed(() =>
   props.days.findIndex((day) => day.isToday),
 )
@@ -234,6 +242,14 @@ function showDot(day: CashFlowDay) {
               stop-opacity="0"
             />
           </linearGradient>
+          <clipPath v-if="hasCriticalDays" id="criticalLineClip">
+            <rect
+              :x="padding.left - 2"
+              :y="criticalClipY"
+              :width="plotWidth + 4"
+              :height="padding.top + plotHeight - criticalClipY + 2"
+            />
+          </clipPath>
         </defs>
 
         <rect
@@ -278,6 +294,13 @@ function showDot(day: CashFlowDay) {
 
         <path :d="areaPath" fill="url(#cashFlowFill)" />
         <path :d="linePath" class="cash-flow-chart__line" fill="none" />
+        <path
+          v-if="hasCriticalDays"
+          :d="linePath"
+          class="cash-flow-chart__line cash-flow-chart__line--critical"
+          fill="none"
+          clip-path="url(#criticalLineClip)"
+        />
 
         <line
           v-if="todayIndex >= 0"
@@ -431,6 +454,10 @@ function showDot(day: CashFlowDay) {
   stroke-width: 2.25;
   stroke-linejoin: round;
   stroke-linecap: round;
+}
+
+.cash-flow-chart__line--critical {
+  stroke: var(--color-negative, #e05151);
 }
 
 .cash-flow-chart__today {

@@ -307,7 +307,7 @@ function setHovered(id: string | null) {
 
 .invoice-spend-donut__values span:first-child {
   color: var(--color-ink);
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   font-weight: var(--weight-semibold);
 }
 

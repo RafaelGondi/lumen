@@ -90,7 +90,7 @@ function formatMoney(value: number) {
 
 .last-installments__total {
   color: var(--color-ink);
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -145,7 +145,7 @@ function formatMoney(value: number) {
   grid-row: 1 / 3;
   align-self: center;
   color: var(--color-ink);
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
