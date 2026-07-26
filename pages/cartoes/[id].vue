@@ -161,6 +161,22 @@ const projectionTotal = computed(() =>
   ),
 )
 
+/**
+ * Última parcela de compras parceladas nesta fatura.
+ * Não filtra por occurrenceMonth: o ciclo da fatura atravessa dois meses do
+ * calendário, então a ocorrência quase nunca cai no mês da competência. A API
+ * já devolve apenas lançamentos desta fatura.
+ */
+const lastInstallments = computed(() =>
+  (invoice.value?.entries ?? []).filter(
+    (entry) =>
+      entry.recurrence === 'installment' &&
+      entry.installmentIndex !== null &&
+      entry.installmentCount !== null &&
+      entry.installmentIndex === entry.installmentCount,
+  ),
+)
+
 const activeSpendGroups = computed(() =>
   spendGroupBy.value === 'supercategory'
     ? (invoice.value?.supercategories ?? [])
@@ -562,6 +578,11 @@ async function onPaymentSaved() {
         </div>
       </UiCard>
       </div>
+
+      <CardsLastInstallmentsBanner
+        v-if="lastInstallments.length"
+        :items="lastInstallments"
+      />
 
       <UiCard class="card-categories">
         <div class="card-categories__heading">

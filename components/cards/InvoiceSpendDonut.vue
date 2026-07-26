@@ -78,6 +78,16 @@ const tooltipStyle = computed(() => {
   }
 })
 
+/**
+ * Arredonda para 3 casas: Math.cos/sin podem diferir no último bit entre o V8
+ * do servidor e o do navegador, e a diferença vaza para o atributo `d` do SVG,
+ * quebrando a hidratação e fazendo a página repintar. Em um viewBox de 100
+ * unidades isso é precisão sub-pixel.
+ */
+function fixed(value: number) {
+  return Math.round(value * 1000) / 1000
+}
+
 function polarToCartesian(
   centerX: number,
   centerY: number,
@@ -86,8 +96,8 @@ function polarToCartesian(
 ) {
   const radians = ((angleInDegrees - 90) * Math.PI) / 180
   return {
-    x: centerX + radius * Math.cos(radians),
-    y: centerY + radius * Math.sin(radians),
+    x: fixed(centerX + radius * Math.cos(radians)),
+    y: fixed(centerY + radius * Math.sin(radians)),
   }
 }
 
