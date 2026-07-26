@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bell, CircleHelp, Menu, X } from '@lucide/vue'
+import { Menu, X } from '@lucide/vue'
 
 const route = useRoute()
 const menuOpen = ref(false)
@@ -75,24 +75,6 @@ onBeforeUnmount(() => {
 
         <div class="topbar__actions">
           <SearchGlobalSearch />
-          <button type="button" class="topbar__icon-btn topbar__icon-btn--desktop" aria-label="Ajuda">
-            <CircleHelp aria-hidden="true" />
-          </button>
-          <button
-            class="notification-button topbar__icon-btn topbar__icon-btn--desktop"
-            type="button"
-            aria-label="Notificações"
-          >
-            <Bell aria-hidden="true" />
-            <span aria-hidden="true" />
-          </button>
-          <div class="account">
-            <span class="account__avatar">RM</span>
-            <div class="account__meta">
-              <strong>Rafael Martins</strong>
-              <span>Soliê Tecnologia</span>
-            </div>
-          </div>
         </div>
       </div>
     </header>
@@ -238,80 +220,6 @@ onBeforeUnmount(() => {
   gap: var(--space-2);
 }
 
-.topbar__icon-btn {
-  position: relative;
-  display: grid;
-  width: 2.25rem;
-  height: 2.25rem;
-  padding: 0;
-  place-items: center;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-nav-muted);
-  cursor: pointer;
-}
-
-.topbar__icon-btn:hover {
-  background: rgb(255 255 255 / 7%);
-  color: var(--color-white);
-}
-
-.topbar__icon-btn svg {
-  width: 1.1rem;
-  height: 1.1rem;
-}
-
-.notification-button span {
-  position: absolute;
-  top: 0.45rem;
-  right: 0.45rem;
-  width: 0.4rem;
-  height: 0.4rem;
-  border: 2px solid var(--color-nav);
-  border-radius: 50%;
-  background: #e6a548;
-}
-
-.account {
-  display: flex;
-  min-width: 12rem;
-  padding-left: var(--space-4);
-  margin-left: var(--space-2);
-  align-items: center;
-  gap: var(--space-3);
-  border-left: 1px solid rgb(255 255 255 / 12%);
-}
-
-.account__avatar {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  flex-shrink: 0;
-  place-items: center;
-  border-radius: var(--radius-sm);
-  background: #e8eef6;
-  color: var(--color-brand-ink);
-  font-size: 0.6875rem;
-  font-weight: var(--weight-bold);
-}
-
-.account__meta {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.account__meta strong {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-}
-
-.account__meta span {
-  color: var(--color-nav-muted);
-  font-size: 0.625rem;
-}
-
 .page {
   width: min(calc(100% - var(--space-12)), var(--content-max));
   padding: var(--space-8) 0 var(--space-12);
@@ -340,17 +248,8 @@ onBeforeUnmount(() => {
     width: auto;
   }
 
-  .main-nav,
-  .topbar__icon-btn--desktop,
-  .account__meta {
+  .main-nav {
     display: none;
-  }
-
-  .account {
-    min-width: 0;
-    padding-left: 0;
-    margin-left: 0;
-    border-left: 0;
   }
 
   .page {
