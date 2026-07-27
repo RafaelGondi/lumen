@@ -135,7 +135,7 @@ function buildCategories(entries: CardInvoiceEntry[]) {
   return buildSpendGroups(entries, (entry) => ({
     id: entry.categoryName ?? 'Outros',
     name: entry.categoryName ?? 'Outros',
-    color: entry.categoryColor ?? '#5d6570',
+    color: entry.categoryColor ?? '#475d76',
   }))
 }
 
@@ -143,7 +143,7 @@ function buildSupercategories(entries: CardInvoiceEntry[]) {
   return buildSpendGroups(entries, (entry) => ({
     id: entry.supercategoryName ?? 'Sem supercategoria',
     name: entry.supercategoryName ?? 'Sem supercategoria',
-    color: entry.supercategoryColor ?? '#5d6570',
+    color: entry.supercategoryColor ?? '#475d76',
   }))
 }
 

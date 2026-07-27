@@ -114,38 +114,7 @@ export function categoryIcon(name: string): Component {
   return categoryIconMap[name] ?? Tag
 }
 
-export const categoryColorPalette = [
-  '#c62828',
-  '#8e1b1b',
-  '#e05252',
-  '#e0526f',
-  '#d9541e',
-  '#a3411a',
-  '#d98e0b',
-  '#c2a018',
-  '#7ba616',
-  '#2f9e4f',
-  '#188a66',
-  '#166534',
-  '#4d7c0f',
-  '#0f9b8e',
-  '#1990c9',
-  '#2f6fce',
-  '#1d4ed8',
-  '#1e3a6b',
-  '#5b5bd6',
-  '#7c4dc4',
-  '#9333b5',
-  '#c026d3',
-  '#c2337f',
-  '#d6588f',
-  '#6b4423',
-  '#96591c',
-  '#44484f',
-  '#5d6570',
-  '#39465a',
-  '#8a8f98',
-]
+/** A paleta de cor mora em utils/categoryPalette.ts — só cores do Akoma. */
 
 export const categoryTypeOptions: { value: CategoryType; label: string }[] = [
   { value: 'expense', label: 'Despesa' },

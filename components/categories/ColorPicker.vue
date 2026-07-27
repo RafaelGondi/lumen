@@ -7,22 +7,26 @@ const model = defineModel<string>({ required: true })
 <template>
   <div class="color-picker" role="radiogroup" aria-label="Cor">
     <button
-      v-for="color in categoryColorPalette"
-      :key="color"
+      v-for="color in categoryColorSwatches"
+      :key="color.hex"
       type="button"
       role="radio"
       class="color-picker__swatch"
-      :style="{ background: color }"
-      :aria-checked="model === color"
-      :aria-label="`Cor ${color}`"
-      @click="model = color"
+      :style="{ background: color.hex }"
+      :aria-checked="model === color.hex"
+      :aria-label="color.label"
+      @click="model = color.hex"
     >
-      <Check v-if="model === color" aria-hidden="true" />
+      <Check v-if="model === color.hex" aria-hidden="true" />
     </button>
   </div>
 </template>
 
 <style scoped>
+/**
+ * 10 colunas com famílias de 5 shades: cada linha cobre duas famílias
+ * inteiras, então as faixas de matiz continuam legíveis mesmo sem rótulo.
+ */
 .color-picker {
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));
