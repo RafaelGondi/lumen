@@ -39,8 +39,17 @@ const { formatCurrency } = useCurrency()
 <style scoped>
 .stat-card {
   position: relative;
-  min-height: 15.5rem;
   overflow: hidden;
+}
+
+/**
+ * Sem o gradiente escuro, uma altura mínima fixa virava espaço morto. Os
+ * cards se igualam pelo grid e o breakdown ancora na base, então a altura
+ * passa a vir do conteúdo — hierarquia por ritmo, não por caixa.
+ */
+.stat-card :deep(.ak-card__body) {
+  display: flex;
+  flex-direction: column;
 }
 
 .stat-card--positive {
@@ -51,10 +60,14 @@ const { formatCurrency } = useCurrency()
   --stat-value-color: var(--color-negative-ink);
 }
 
+/**
+ * O saldo atual é o número que importa na tela. A ênfase vem de superfície
+ * e borda — não de um gradiente escuro, que puxava o card para a linguagem
+ * de dashboard que o Akoma evita ("flat before float").
+ */
 .stat-card--featured {
-  border-color: var(--color-nav);
-  background: linear-gradient(180deg, #1a2740 0%, var(--color-nav) 62%);
-  color: var(--color-white);
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-subtle);
 }
 
 .stat-card__header {
@@ -86,9 +99,9 @@ const { formatCurrency } = useCurrency()
 }
 
 .stat-card__value {
-  margin-top: var(--space-5);
+  margin-top: var(--space-6);
   color: var(--stat-value-color, var(--color-ink));
-  font-size: clamp(1.5rem, 2.1vw, var(--text-2xl));
+  font-size: var(--text-metric);
   font-weight: var(--weight-semibold);
   line-height: var(--leading-tight);
 }
@@ -102,7 +115,7 @@ const { formatCurrency } = useCurrency()
 .stat-card__breakdown {
   display: grid;
   padding-top: var(--space-4);
-  margin: var(--space-5) 0 0;
+  margin: auto 0 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
   border-top: 1px solid var(--color-border);
@@ -137,34 +150,7 @@ const { formatCurrency } = useCurrency()
   color: var(--color-negative) !important;
 }
 
-.stat-card--featured .stat-card__header p,
-.stat-card--featured .stat-card__support,
-.stat-card--featured .stat-card__breakdown dt {
-  color: #a4b2c8;
-}
-
 .stat-card--featured .stat-card__icon {
-  background: rgb(255 255 255 / 8%);
-  color: #b8cbe4;
-}
-
-.stat-card--featured .stat-card__value,
-.stat-card--featured .stat-card__breakdown dd {
-  color: var(--color-white);
-}
-
-.stat-card--featured .stat-card__breakdown,
-.stat-card--featured .stat-card__breakdown div + div {
-  border-color: rgb(255 255 255 / 12%);
-}
-
-.stat-card--featured .stat-card__detail--positive {
-  color: #7fd6ac !important;
-}
-
-@media (max-width: 480px) {
-  .stat-card {
-    min-height: 0;
-  }
+  background: var(--color-surface);
 }
 </style>

@@ -118,28 +118,27 @@ async function removeAccount(account: Account) {
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-6);
-  border: 1px solid var(--color-nav);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
-  background: linear-gradient(180deg, #1a2740 0%, var(--color-nav) 62%);
-  color: var(--color-white);
-  box-shadow: var(--shadow-xs);
+  background: var(--color-surface-subtle);
+  color: var(--color-ink);
 }
 
 .accounts-summary__label {
-  color: #a4b2c8;
+  color: var(--color-ink-secondary);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
 }
 
 .accounts-summary__value {
   margin-top: var(--space-2);
-  font-size: clamp(1.5rem, 2vw, var(--text-2xl));
+  font-size: var(--text-metric);
   font-weight: var(--weight-semibold);
   letter-spacing: -0.02em;
 }
 
 .accounts-summary__count {
-  color: #a4b2c8;
+  color: var(--color-ink-muted);
   font-size: var(--text-xs);
 }
 

@@ -285,10 +285,10 @@ defineExpose({ openSearch, closeSearch })
   padding: 0 0.55rem 0 0.75rem;
   align-items: center;
   gap: 0.55rem;
-  border: 1px solid rgb(255 255 255 / 12%);
+  border: 1px solid var(--color-border);
   border-radius: 999px;
-  background: rgb(255 255 255 / 8%);
-  color: var(--color-nav-muted);
+  background: var(--color-surface-subtle);
+  color: var(--color-ink-muted);
   cursor: pointer;
   transition:
     background-color var(--transition-fast),
@@ -297,9 +297,9 @@ defineExpose({ openSearch, closeSearch })
 }
 
 .global-search__trigger:hover {
-  background: rgb(255 255 255 / 12%);
-  border-color: rgb(255 255 255 / 18%);
-  color: var(--color-white);
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+  color: var(--color-ink);
 }
 
 .global-search__trigger svg {
@@ -324,13 +324,13 @@ defineExpose({ openSearch, closeSearch })
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-nav-muted);
+  color: var(--color-ink-muted);
   cursor: pointer;
 }
 
 .global-search__trigger-icon:hover {
-  background: rgb(255 255 255 / 7%);
-  color: var(--color-white);
+  background: var(--color-surface-subtle);
+  color: var(--color-ink);
 }
 
 .global-search__trigger-icon svg {
@@ -344,10 +344,10 @@ defineExpose({ openSearch, closeSearch })
   height: 1.35rem;
   padding: 0 0.35rem;
   place-items: center;
-  border: 1px solid rgb(255 255 255 / 14%);
+  border: 1px solid var(--color-border);
   border-radius: 0.35rem;
-  background: rgb(255 255 255 / 10%);
-  color: var(--color-nav-muted);
+  background: var(--color-surface);
+  color: var(--color-ink-muted);
   font-family: var(--font-sans);
   font-size: 0.6875rem;
   font-weight: var(--weight-semibold);

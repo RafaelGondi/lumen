@@ -1,5 +1,9 @@
 <script setup lang="ts">
-withDefaults(
+/**
+ * Delega ao AkCard. O padding do Lumen (none/md/lg) mapeia para a escala do
+ * Akoma; a superfície plana (sem sombra) passa a vir do design system.
+ */
+const props = withDefaults(
   defineProps<{
     padding?: 'none' | 'md' | 'lg'
     interactive?: boolean
@@ -9,50 +13,30 @@ withDefaults(
     interactive: false,
   },
 )
+
+const akPadding = computed(() =>
+  props.padding === 'lg' ? 'md' : props.padding === 'md' ? 'sm' : 'none',
+)
 </script>
 
 <template>
-  <section
+  <AkCard
     class="ui-card"
-    :class="[
-      `ui-card--padding-${padding}`,
-      { 'ui-card--interactive': interactive },
-    ]"
+    :class="{ 'ui-card--flush': padding === 'none' }"
+    :padding="akPadding"
+    :interactive="interactive"
   >
     <slot />
-  </section>
+  </AkCard>
 </template>
 
 <style scoped>
-.ui-card {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-xs);
-}
-
-.ui-card--padding-none {
+/**
+ * `padding="none"` no Akoma ainda reserva 18px laterais no corpo do card.
+ * No Lumen esse modo existe para listas que sangram até a borda (cada linha
+ * controla o próprio padding e o hover precisa ir de ponta a ponta).
+ */
+.ui-card--flush :deep(.ak-card__body) {
   padding: 0;
-}
-
-.ui-card--padding-md {
-  padding: var(--space-5);
-}
-
-.ui-card--padding-lg {
-  padding: var(--space-6);
-}
-
-.ui-card--interactive {
-  transition:
-    border-color var(--transition-base),
-    box-shadow var(--transition-base),
-    transform var(--transition-base);
-}
-
-.ui-card--interactive:hover {
-  border-color: var(--color-border-strong);
-  box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
 }
 </style>

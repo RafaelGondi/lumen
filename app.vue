@@ -121,8 +121,9 @@ onBeforeUnmount(() => {
   top: 0;
   z-index: 40;
   height: 4.25rem;
+  border-bottom: 1px solid var(--color-border);
   background: var(--color-nav);
-  color: var(--color-white);
+  color: var(--color-ink);
 }
 
 .topbar__inner {
@@ -145,7 +146,7 @@ onBeforeUnmount(() => {
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-white);
+  color: var(--color-ink-secondary);
 }
 
 .topbar__menu-btn svg {
@@ -155,7 +156,8 @@ onBeforeUnmount(() => {
 
 .brand {
   display: flex;
-  width: 11.5rem;
+  width: auto;
+  margin-right: var(--space-8);
   flex-shrink: 0;
   align-items: center;
   gap: var(--space-3);
@@ -166,14 +168,15 @@ onBeforeUnmount(() => {
   width: 1.875rem;
   height: 1.875rem;
   place-items: center;
-  border: 1px solid rgb(255 255 255 / 22%);
   border-radius: var(--radius-sm);
-  background: #1f5da3;
+  background: var(--color-brand);
+  color: var(--color-white);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
 }
 
 .brand__name {
+  color: var(--color-ink);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   letter-spacing: 0.16em;
@@ -192,24 +195,26 @@ onBeforeUnmount(() => {
   color: var(--color-nav-muted);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
+  white-space: nowrap;
   transition: color var(--transition-fast);
 }
 
 .main-nav a:hover {
-  color: var(--color-white);
+  color: var(--color-ink);
 }
 
 .main-nav__item--active {
-  color: var(--color-white) !important;
+  color: var(--color-ink) !important;
+  font-weight: var(--weight-semibold);
 }
 
 .main-nav__item--active::after {
   position: absolute;
   right: 0;
-  bottom: 0;
+  bottom: -1px;
   left: 0;
   height: 2px;
-  background: #5f96d6;
+  background: var(--color-brand);
   content: "";
 }
 
@@ -262,7 +267,7 @@ onBeforeUnmount(() => {
     position: fixed;
     inset: 4.25rem 0 0;
     z-index: 45;
-    background: rgb(15 23 42 / 45%);
+    background: color-mix(in srgb, var(--color-ink) 45%, transparent);
   }
 
   .mobile-nav {

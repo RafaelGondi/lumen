@@ -632,8 +632,8 @@ function formatPercent(value: number) {
   max-width: 14rem;
   padding: 0.4rem 0.55rem;
   border-radius: var(--radius-sm);
-  background: var(--color-nav);
-  color: var(--color-white);
+  background: var(--toast-bg);
+  color: var(--toast-fg);
   font-size: 0.6875rem;
   font-weight: var(--weight-medium);
   line-height: 1.3;
@@ -650,7 +650,7 @@ function formatPercent(value: number) {
   top: 100%;
   left: 50%;
   border: 0.3rem solid transparent;
-  border-top-color: var(--color-nav);
+  border-top-color: var(--toast-bg);
   content: '';
   transform: translateX(-50%);
 }

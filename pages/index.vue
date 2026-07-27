@@ -44,19 +44,15 @@ const {
     </PageHeading>
 
     <section class="overview" aria-labelledby="overview-title">
-      <div class="overview__heading">
-        <div>
-          <h2 id="overview-title">Resumo financeiro</h2>
-          <p>
-            Posição consolidada de
-            {{ selectedMonth?.fullLabel.toLowerCase() ?? '…' }}
+      <AkSectionHeader class="overview__heading">
+        <span id="overview-title">Resumo financeiro</span>
+        <template #action>
+          <p class="overview__updated">
+            <span aria-hidden="true" />
+            Atualizado: {{ selectedMonth?.updatedAt ?? '—' }}
           </p>
-        </div>
-        <p class="overview__updated">
-          <span aria-hidden="true" />
-          Atualizado: {{ selectedMonth?.updatedAt ?? '—' }}
-        </p>
-      </div>
+        </template>
+      </AkSectionHeader>
 
       <DashboardSkeleton v-if="isLoading || !selectedMonth" />
 
@@ -118,22 +114,7 @@ const {
 }
 
 .overview__heading {
-  display: flex;
   margin-bottom: var(--space-4);
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-6);
-}
-
-.overview__heading h2 {
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
-}
-
-.overview__heading > div p {
-  margin-top: var(--space-1);
-  color: var(--color-ink-muted);
-  font-size: var(--text-xs);
 }
 
 .overview__updated {
@@ -141,7 +122,7 @@ const {
   align-items: center;
   gap: var(--space-2);
   color: var(--color-ink-muted);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
 }
 
 .overview__updated span {
@@ -172,8 +153,8 @@ const {
   }
 
   .overview__heading {
-    flex-direction: column;
     align-items: flex-start;
+    flex-direction: column;
     gap: var(--space-2);
   }
 }
