@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url'
+import { AKOMA_ACCENT, AKOMA_MOOD } from './utils/theme'
 
 /**
  * O @sysvale/cuida-icons (dependência de ícones do Akoma) publica só `dist/*`,
@@ -53,7 +54,11 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      htmlAttrs: { lang: 'pt-BR', 'data-mood': 'site', 'data-accent': 'slate' },
+      htmlAttrs: {
+        'lang': 'pt-BR',
+        'data-mood': AKOMA_MOOD,
+        'data-accent': AKOMA_ACCENT,
+      },
       title: 'Lumen — Gestão financeira',
       meta: [
         {

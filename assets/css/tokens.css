@@ -8,8 +8,14 @@
  *
  * Regra: nada de hex novo neste arquivo. Se falta um valor, ele deve nascer
  * como token do Akoma — ou como override explícito na seção do fim.
+ *
+ * O bloco vale para `:root` e para qualquer elemento com `data-theme`. Custom
+ * property resolve onde é declarada: sem repetir os aliases no escopo do
+ * `data-theme`, eles congelariam no valor do root e um subtree de tema
+ * diferente continuaria com as cores do tema global.
  */
-:root {
+:root,
+[data-theme] {
   /* Superfícies */
   --color-canvas: var(--bg);
   --color-surface: var(--bg-elevated);
@@ -42,7 +48,13 @@
   --color-info-soft: var(--info-soft);
   /* --color-warning e --color-info já existem no Akoma com o mesmo nome */
 
-  --color-white: var(--accent-contrast);
+  /**
+   * Branco absoluto, não entrada de paleta: serve de tinta sobre superfícies
+   * saturadas (marcas de banco, chips de categoria, botão primário), que são
+   * escuras nos dois temas. Apontar isto para --accent-contrast quebra em
+   * subtree escuro, onde o accent clareia e o contraste dele vira escuro.
+   */
+  --color-white: #fff;
   --color-focus: var(--accent-ink);
 
   /* Chrome de navegação — claro e plano (flat before float) */
@@ -90,4 +102,24 @@
   --card-bg: var(--bg-elevated);
   --page-pad-x: 0;
   --page-pad-top: 0;
+}
+
+/**
+ * Superfície de ênfase: o slate profundo, para a única peça da tela que deve
+ * pesar mais que as outras.
+ *
+ * Declarada só no :root de propósito. Custom property guarda o valor
+ * computado onde foi declarada, então um subtree com data-theme="dark"
+ * herda este tom claro-tema em vez de recalcular --accent-darker — que no
+ * escuro clareia e devolveria um slate pálido, o oposto do que queremos.
+ */
+:root {
+  /**
+   * O slate mais profundo da paleta, aprofundado com a tinta do sistema.
+   * A mistura é com --fill-strong e não com preto: preto puro esfria a cor,
+   * e o Akoma pede neutros minerais ("warm, never cold"). Mais escuro aqui
+   * é o que devolve margem para o texto de apoio voltar a ser discreto sem
+   * cair abaixo do contraste mínimo.
+   */
+  --surface-emphasis: color-mix(in srgb, var(--accent-darker) 72%, var(--fill-strong));
 }

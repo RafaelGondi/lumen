@@ -1,15 +1,33 @@
 <script setup lang="ts">
 import type { FinancialStat } from '~/types/finance'
+import { AKOMA_ACCENT, AKOMA_MOOD } from '~/utils/theme'
 
 defineProps<{
   stat: FinancialStat
 }>()
 
 const { formatCurrency } = useCurrency()
+
+/**
+ * O Akoma escopa tema por atributo, mas os seletores são compostos
+ * (`[data-mood][data-theme]`, `[data-accent][data-theme]`). Um subtree que
+ * declare só data-theme deixa de casar com eles e cai no accent padrão —
+ * violeta, não o do app. Os três precisam viajar juntos.
+ */
+const darkSurfaceAttrs = {
+  'data-mood': AKOMA_MOOD,
+  'data-accent': AKOMA_ACCENT,
+  'data-theme': 'dark',
+}
 </script>
 
 <template>
-  <UiCard class="stat-card" :class="`stat-card--${stat.tone}`" padding="md">
+  <UiCard
+    class="stat-card"
+    :class="`stat-card--${stat.tone}`"
+    v-bind="stat.tone === 'featured' ? darkSurfaceAttrs : {}"
+    padding="md"
+  >
     <div class="stat-card__header">
       <p>{{ stat.label }}</p>
       <span class="stat-card__icon" aria-hidden="true">
@@ -61,13 +79,29 @@ const { formatCurrency } = useCurrency()
 }
 
 /**
- * O saldo atual é o número que importa na tela. A ênfase vem de superfície
- * e borda — não de um gradiente escuro, que puxava o card para a linguagem
- * de dashboard que o Akoma evita ("flat before float").
+ * O saldo atual é o número que importa na tela, então ganha superfície
+ * escura. Em vez de um gradiente na mão, o card carrega data-theme="dark":
+ * o Akoma escopa o tema por atributo, então todo o subtree recebe os tokens
+ * escuros — inclusive --success e --danger nas variantes calibradas para
+ * fundo escuro. Continua plano, sem sombra e sem hex avulso.
  */
 .stat-card--featured {
-  border-color: var(--color-border-strong);
-  background: var(--color-surface-subtle);
+  border-color: transparent;
+  background: var(--surface-emphasis);
+
+  /**
+   * A rampa neutra do tema escuro é calibrada para o fundo escuro do Akoma
+   * (#1c1f1e). O slate de ênfase é bem mais claro, e sobre ele o texto
+   * terciário caía para 2,46:1 — reprovado no AA. Aqui a hierarquia de
+   * tinta é derivada do próprio fundo do card.
+   */
+  --color-ink: var(--color-white);
+  --color-ink-secondary: color-mix(in srgb, var(--color-white) 72%, var(--surface-emphasis));
+  --color-ink-muted: color-mix(in srgb, var(--color-white) 58%, var(--surface-emphasis));
+  --color-positive: var(--success);
+  --color-positive-ink: var(--success);
+  --color-negative: var(--danger);
+  --color-negative-ink: var(--danger);
 }
 
 .stat-card__header {
@@ -150,7 +184,17 @@ const { formatCurrency } = useCurrency()
   color: var(--color-negative) !important;
 }
 
+/**
+ * Sobre o slate profundo, os degraus neutros do tema escuro não valem: o
+ * contraste tem que ser com o próprio fundo, então clareamos a partir dele.
+ */
 .stat-card--featured .stat-card__icon {
-  background: var(--color-surface);
+  background: color-mix(in srgb, var(--color-white) 12%, transparent);
+  color: var(--color-white);
+}
+
+.stat-card--featured .stat-card__breakdown,
+.stat-card--featured .stat-card__breakdown div + div {
+  border-color: color-mix(in srgb, var(--color-white) 15%, transparent);
 }
 </style>
