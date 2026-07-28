@@ -1,5 +1,21 @@
 <script setup lang="ts">
+import {
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  LineElement,
+  LinearScale,
+  PointElement,
+  Tooltip,
+  type Chart,
+  type ChartOptions,
+  type Plugin,
+  type ScriptableLineSegmentContext,
+} from 'chart.js'
+import { Line } from 'vue-chartjs'
 import type { CashFlowDay } from '~/types/cashFlow'
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip)
 
 const props = defineProps<{
   days: CashFlowDay[]
@@ -11,152 +27,223 @@ const emit = defineEmits<{
   select: [date: string]
 }>()
 
-const hoveredDate = ref<string | null>(null)
+const CRITICAL_FALLBACK = 500
+const threshold = computed(() => props.criticalThreshold ?? CRITICAL_FALLBACK)
 
-/** Proporção baixa: evita o gráfico “gigante” em telas largas. */
-const width = 840
-const height = 240
-const padding = { top: 16, right: 12, bottom: 30, left: 48 }
+/**
+ * Cores saem dos tokens do Akoma, mas o Chart.js desenha em canvas e só
+ * aceita string — não resolve `var()`. Então lemos os valores computados uma
+ * vez, quando o componente monta no cliente.
+ */
+const wrapRef = ref<HTMLElement | null>(null)
+const tokens = ref({
+  line: '#5184b1',
+  danger: '#9d443a',
+  ink: '#213129',
+  muted: '#67736b',
+  border: 'rgba(33,49,41,.11)',
+  surface: '#ffffff',
+})
 
-const plotWidth = width - padding.left - padding.right
-const plotHeight = height - padding.top - padding.bottom
+onMounted(() => {
+  const el = wrapRef.value
+  if (!el) return
+  const cs = getComputedStyle(el)
+  const read = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback
+  tokens.value = {
+    line: read('--cash-flow-line', tokens.value.line),
+    danger: read('--color-negative', tokens.value.danger),
+    ink: read('--color-ink', tokens.value.ink),
+    muted: read('--color-ink-muted', tokens.value.muted),
+    border: read('--color-border', tokens.value.border),
+    surface: read('--color-surface', tokens.value.surface),
+  }
+})
 
-const points = computed(() =>
-  props.days.map((day, index) => ({
-    day,
-    index,
-    x: xFor(index),
-    y: yFor(day.balance),
-  })),
-)
+const todayIndex = computed(() => props.days.findIndex((d) => d.isToday))
+const selectedIndex = computed(() => props.days.findIndex((d) => d.date === props.selectedDate))
 
-const balances = computed(() => props.days.map((day) => day.balance))
-
-const yDomain = computed(() => {
-  const values = balances.value
+/** Escala com folga só onde importa: embaixo apenas quando há saldo negativo. */
+const yBounds = computed(() => {
+  const values = props.days.map((d) => d.balance)
   if (!values.length) return { min: 0, max: 1000 }
   const rawMin = Math.min(0, ...values)
   const rawMax = Math.max(...values, 100)
   const span = Math.max(rawMax - rawMin, 200)
-  const padTop = span * 0.08
-  const padBottom = rawMin < 0 ? span * 0.08 : 0
   return {
-    min: rawMin - padBottom,
-    max: rawMax + padTop,
+    min: rawMin - (rawMin < 0 ? span * 0.08 : 0),
+    max: rawMax + span * 0.08,
   }
 })
 
-const ticks = computed(() => {
-  const { min, max } = yDomain.value
-  const steps = 4
-  return Array.from({ length: steps + 1 }, (_, index) => {
-    return max - ((max - min) / steps) * index
-  })
-})
+const pointRadius = computed(() =>
+  props.days.map((d, i) => {
+    if (i === selectedIndex.value) return 6
+    if (d.isToday) return 5
+    if (d.isCritical) return 4
+    return d.movements.length ? 3 : 0
+  }),
+)
 
-function xFor(index: number) {
-  if (props.days.length <= 1) return padding.left + plotWidth / 2
-  return padding.left + (index / (props.days.length - 1)) * plotWidth
+const pointColor = computed(() =>
+  props.days.map((d, i) =>
+    d.isCritical ? tokens.value.danger : i === selectedIndex.value || d.isToday ? tokens.value.line : tokens.value.line,
+  ),
+)
+
+const chartData = computed(() => ({
+  labels: props.days.map((d) => String(d.day)),
+  datasets: [
+    {
+      label: 'Saldo',
+      data: props.days.map((d) => d.balance),
+      borderColor: tokens.value.line,
+      borderWidth: 2,
+      /**
+       * Substitui o clipPath do SVG anterior: o Chart.js decide a cor de cada
+       * segmento, então a linha vira vermelha exatamente onde o saldo cruza o
+       * limiar, sem recorte manual.
+       */
+      segment: {
+        borderColor: (ctx: ScriptableLineSegmentContext) => {
+          const menor = Math.min(ctx.p0.parsed.y ?? Infinity, ctx.p1.parsed.y ?? Infinity)
+          return menor <= threshold.value ? tokens.value.danger : tokens.value.line
+        },
+      },
+      backgroundColor: (ctx: { chart: Chart }) => {
+        const { ctx: c, chartArea } = ctx.chart
+        if (!chartArea) return 'transparent'
+        const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
+        g.addColorStop(0, `color-mix(in srgb, ${tokens.value.line} 18%, transparent)`)
+        g.addColorStop(1, `color-mix(in srgb, ${tokens.value.line} 1%, transparent)`)
+        return g
+      },
+      fill: true,
+      /** Mesma curva do SVG anterior: suaviza sem ultrapassar os pontos. */
+      cubicInterpolationMode: 'monotone' as const,
+      pointRadius: pointRadius.value,
+      pointHoverRadius: 6,
+      pointBackgroundColor: pointColor.value,
+      pointBorderColor: tokens.value.surface,
+      pointBorderWidth: 1.5,
+    },
+  ],
+}))
+
+/** Linha tracejada do dia de hoje, desenhada por baixo dos pontos. */
+const todayLine: Plugin<'line'> = {
+  id: 'todayLine',
+  beforeDatasetsDraw(chart) {
+    const idx = todayIndex.value
+    if (idx < 0) return
+    const { ctx, chartArea, scales } = chart
+    const x = scales.x.getPixelForValue(idx)
+    ctx.save()
+    ctx.strokeStyle = tokens.value.line
+    ctx.globalAlpha = 0.45
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([4, 4])
+    ctx.beginPath()
+    ctx.moveTo(x, chartArea.top)
+    ctx.lineTo(x, chartArea.bottom)
+    ctx.stroke()
+    ctx.restore()
+  },
 }
 
-function yFor(balance: number) {
-  const { min, max } = yDomain.value
-  const ratio = (balance - min) / (max - min || 1)
-  return padding.top + plotHeight * (1 - ratio)
-}
-
-/** Curva monotônica em X (estilo d3.curveMonotoneX) — suave sem “loop”. */
-function monotoneCurve(coords: { x: number; y: number }[]) {
-  if (!coords.length) return ''
-  if (coords.length === 1) return `M${coords[0]!.x} ${coords[0]!.y}`
-
-  const xs = coords.map((point) => point.x)
-  const ys = coords.map((point) => point.y)
-  const n = coords.length
-  const dx: number[] = []
-  const dy: number[] = []
-  const slopes: number[] = []
-
-  for (let index = 0; index < n - 1; index += 1) {
-    dx[index] = xs[index + 1]! - xs[index]!
-    dy[index] = ys[index + 1]! - ys[index]!
-    slopes[index] = dy[index]! / (dx[index]! || 1e-6)
-  }
-
-  const tangents = new Array<number>(n).fill(0)
-  tangents[0] = slopes[0]!
-  tangents[n - 1] = slopes[n - 2]!
-  for (let index = 1; index < n - 1; index += 1) {
-    if (slopes[index - 1]! * slopes[index]! <= 0) {
-      tangents[index] = 0
-    } else {
-      tangents[index] = (slopes[index - 1]! + slopes[index]!) / 2
+/** Zero e limiar crítico: as duas referências que explicam a cor da linha. */
+const referenceLines: Plugin<'line'> = {
+  id: 'referenceLines',
+  beforeDatasetsDraw(chart) {
+    const { ctx, chartArea, scales } = chart
+    const draw = (value: number, color: string, alpha: number, dash: number[]) => {
+      const y = scales.y.getPixelForValue(value)
+      if (y < chartArea.top || y > chartArea.bottom) return
+      ctx.save()
+      ctx.strokeStyle = color
+      ctx.globalAlpha = alpha
+      ctx.lineWidth = 1
+      ctx.setLineDash(dash)
+      ctx.beginPath()
+      ctx.moveTo(chartArea.left, y)
+      ctx.lineTo(chartArea.right, y)
+      ctx.stroke()
+      ctx.restore()
     }
-  }
-
-  for (let index = 0; index < n - 1; index += 1) {
-    if (Math.abs(slopes[index]!) < 1e-8) {
-      tangents[index] = 0
-      tangents[index + 1] = 0
-    } else {
-      const alpha = tangents[index]! / slopes[index]!
-      const beta = tangents[index + 1]! / slopes[index]!
-      const s = alpha * alpha + beta * beta
-      if (s > 9) {
-        const factor = 3 / Math.sqrt(s)
-        tangents[index] = factor * alpha * slopes[index]!
-        tangents[index + 1] = factor * beta * slopes[index]!
-      }
-    }
-  }
-
-  let path = `M${xs[0]} ${ys[0]}`
-  for (let index = 0; index < n - 1; index += 1) {
-    const controlX1 = xs[index]! + dx[index]! / 3
-    const controlY1 = ys[index]! + (tangents[index]! * dx[index]!) / 3
-    const controlX2 = xs[index + 1]! - dx[index]! / 3
-    const controlY2 = ys[index + 1]! - (tangents[index + 1]! * dx[index]!) / 3
-    path += ` C${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${xs[index + 1]} ${ys[index + 1]}`
-  }
-  return path
+    draw(threshold.value, tokens.value.danger, 0.28, [3, 3])
+    draw(0, tokens.value.danger, 0.5, [6, 3])
+  },
 }
 
-const linePath = computed(() =>
-  monotoneCurve(points.value.map((point) => ({ x: point.x, y: point.y }))),
-)
+/* ---------- tooltip em HTML ---------- */
 
-const areaPath = computed(() => {
-  if (!points.value.length || !linePath.value) return ''
-  const first = points.value[0]!
-  const last = points.value[points.value.length - 1]!
-  const baseline = yFor(Math.max(0, yDomain.value.min))
-  return `${linePath.value} L${last.x} ${baseline} L${first.x} ${baseline} Z`
-})
+const tooltip = ref<{ day: CashFlowDay; x: number; y: number } | null>(null)
 
-const zeroLineY = computed(() => {
-  if (yDomain.value.min >= 0 || yDomain.value.max <= 0) return null
-  return yFor(0)
-})
+/**
+ * Tooltip externo em vez do nativo: o nativo desenha no canvas e não daria a
+ * lista de lançamentos com valores coloridos que a versão anterior tinha.
+ * O handler só publica posição e índice; o resto é markup normal.
+ */
+function externalTooltip(context: { chart: Chart; tooltip: any }) {
+  const model = context.tooltip
+  if (!model.opacity) {
+    tooltip.value = null
+    return
+  }
+  const index = model.dataPoints?.[0]?.dataIndex
+  const day = index == null ? null : props.days[index]
+  if (!day) {
+    tooltip.value = null
+    return
+  }
+  tooltip.value = { day, x: model.caretX, y: model.caretY }
+}
 
-const hasCriticalDays = computed(() => props.days.some((day) => day.isCritical))
-
-const criticalClipY = computed(() => {
-  const threshold = props.criticalThreshold ?? 500
-  return yFor(threshold)
-})
-
-const todayIndex = computed(() =>
-  props.days.findIndex((day) => day.isToday),
-)
-
-const tooltipDay = computed(
-  () =>
-    props.days.find((day) => day.date === hoveredDate.value) ?? null,
-)
-
-const tooltipIndex = computed(() =>
-  props.days.findIndex((day) => day.date === hoveredDate.value),
-)
+const chartOptions = computed<ChartOptions<'line'>>(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  /**
+   * O ganho principal sobre o SVG anterior: passar o mouse em qualquer ponto
+   * da área trava no dia mais próximo, em vez de exigir acertar o ponto.
+   */
+  interaction: { mode: 'index', intersect: false },
+  onClick: (_e, elements) => {
+    const day = props.days[elements[0]?.index ?? -1]
+    if (day) emit('select', day.date)
+  },
+  onHover: (event, elements) => {
+    const target = event.native?.target as HTMLElement | undefined
+    if (target) target.style.cursor = elements.length ? 'pointer' : 'default'
+  },
+  plugins: {
+    legend: { display: false },
+    tooltip: { enabled: false, external: externalTooltip as never },
+  },
+  scales: {
+    x: {
+      grid: { display: false },
+      border: { color: tokens.value.border },
+      ticks: {
+        color: tokens.value.muted,
+        font: { size: 11 },
+        maxRotation: 0,
+        autoSkipPadding: 16,
+      },
+    },
+    y: {
+      min: yBounds.value.min,
+      max: yBounds.value.max,
+      grid: { color: tokens.value.border },
+      border: { display: false },
+      ticks: {
+        color: tokens.value.muted,
+        font: { size: 11 },
+        maxTicksLimit: 5,
+        callback: (value) => formatAxis(Number(value)),
+      },
+    },
+  },
+}))
 
 function formatAxis(value: number) {
   const abs = Math.abs(value)
@@ -170,219 +257,60 @@ function formatAxis(value: number) {
 }
 
 function formatMoney(value: number) {
-  return value.toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  })
-}
-
-function xAxisLabels() {
-  const labels: { day: number; index: number }[] = []
-  const step = 3
-  for (let index = 0; index < props.days.length; index += step) {
-    labels.push({ day: props.days[index]!.day, index })
-  }
-  const last = props.days[props.days.length - 1]
-  if (last && labels[labels.length - 1]?.day !== last.day) {
-    labels.push({ day: last.day, index: props.days.length - 1 })
-  }
-  return labels
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
 function formatSignedMoney(value: number) {
-  const sign = value >= 0 ? '+' : ''
-  return `${sign}${formatMoney(value)}`
-}
-
-function showDot(day: CashFlowDay) {
-  return (
-    day.isToday ||
-    day.date === props.selectedDate ||
-    day.date === hoveredDate.value ||
-    day.movements.length > 0
-  )
+  return `${value >= 0 ? '+' : ''}${formatMoney(value)}`
 }
 </script>
 
 <template>
-  <div class="cash-flow-chart">
+  <div ref="wrapRef" class="cash-flow-chart">
     <div class="cash-flow-chart__heading">
-      <div>
-        <h2>Saldo dia a dia</h2>
-        <p>
-          Saldo nas contas bancárias (projetado) — alinhado ao previsto do
-          dashboard
-        </p>
-      </div>
+      <h2>Saldo dia a dia</h2>
+      <p>
+        Saldo nas contas bancárias (projetado) — alinhado ao previsto do
+        dashboard
+      </p>
     </div>
 
     <div class="cash-flow-chart__plot-wrap">
-      <svg
-        class="cash-flow-chart__svg"
-        :viewBox="`0 0 ${width} ${height}`"
-        role="img"
-        aria-label="Gráfico de saldo diário"
-        preserveAspectRatio="none"
-      >
-        <defs>
-          <linearGradient id="cashFlowFill" x1="0" y1="0" x2="0" y2="1">
-            <stop
-              offset="0%"
-              stop-color="var(--cash-flow-line)"
-              stop-opacity="0.24"
-            />
-            <stop
-              offset="70%"
-              stop-color="var(--cash-flow-line)"
-              stop-opacity="0.06"
-            />
-            <stop
-              offset="100%"
-              stop-color="var(--cash-flow-line)"
-              stop-opacity="0"
-            />
-          </linearGradient>
-          <clipPath v-if="hasCriticalDays" id="criticalLineClip">
-            <rect
-              :x="padding.left - 2"
-              :y="criticalClipY"
-              :width="plotWidth + 4"
-              :height="padding.top + plotHeight - criticalClipY + 2"
-            />
-          </clipPath>
-        </defs>
-
-        <rect
-          v-if="zeroLineY !== null"
-          :x="padding.left"
-          :y="zeroLineY"
-          :width="plotWidth"
-          :height="padding.top + plotHeight - zeroLineY"
-          class="cash-flow-chart__negative-band"
-        />
-
-        <g aria-hidden="true">
-          <line
-            v-for="tick in ticks"
-            :key="tick"
-            :x1="padding.left"
-            :x2="padding.left + plotWidth"
-            :y1="yFor(tick)"
-            :y2="yFor(tick)"
-            class="cash-flow-chart__grid"
-          />
-          <text
-            v-for="tick in ticks"
-            :key="`label-${tick}`"
-            :x="padding.left - 8"
-            :y="yFor(tick) + 3"
-            text-anchor="end"
-            class="cash-flow-chart__axis-label"
-          >
-            {{ formatAxis(tick) }}
-          </text>
-        </g>
-
-        <line
-          v-if="zeroLineY !== null"
-          :x1="padding.left"
-          :x2="padding.left + plotWidth"
-          :y1="zeroLineY"
-          :y2="zeroLineY"
-          class="cash-flow-chart__zero"
-        />
-
-        <path :d="areaPath" fill="url(#cashFlowFill)" />
-        <path :d="linePath" class="cash-flow-chart__line" fill="none" />
-        <path
-          v-if="hasCriticalDays"
-          :d="linePath"
-          class="cash-flow-chart__line cash-flow-chart__line--critical"
-          fill="none"
-          clip-path="url(#criticalLineClip)"
-        />
-
-        <line
-          v-if="todayIndex >= 0"
-          :x1="xFor(todayIndex)"
-          :x2="xFor(todayIndex)"
-          :y1="padding.top"
-          :y2="padding.top + plotHeight"
-          class="cash-flow-chart__today"
-        />
-
-        <g
-          v-for="point in points"
-          :key="point.day.date"
-          class="cash-flow-chart__point-group"
-          @mouseenter="hoveredDate = point.day.date"
-          @mouseleave="hoveredDate = null"
-          @click="emit('select', point.day.date)"
-        >
-          <circle :cx="point.x" :cy="point.y" r="10" fill="transparent" />
-          <circle
-            v-if="showDot(point.day)"
-            :cx="point.x"
-            :cy="point.y"
-            :r="
-              point.day.isToday || point.day.date === selectedDate ? 4.5 : 3
-            "
-            class="cash-flow-chart__dot"
-            :class="{
-              'cash-flow-chart__dot--active':
-                point.day.date === selectedDate ||
-                point.day.date === hoveredDate,
-              'cash-flow-chart__dot--today': point.day.isToday,
-              'cash-flow-chart__dot--critical': point.day.isCritical,
-              'cash-flow-chart__dot--event':
-                point.day.movements.length > 0 && !point.day.isCritical,
-            }"
-          />
-        </g>
-
-        <g aria-hidden="true">
-          <text
-            v-for="label in xAxisLabels()"
-            :key="label.day"
-            :x="xFor(label.index)"
-            :y="height - 8"
-            text-anchor="middle"
-            class="cash-flow-chart__axis-label"
-          >
-            {{ label.day }}
-          </text>
-        </g>
-      </svg>
+      <!--
+        Chart.js desenha em canvas, que não existe no servidor. ClientOnly
+        evita o descompasso de hidratação em vez de contorná-lo.
+      -->
+      <ClientOnly>
+        <Line :data="chartData" :options="chartOptions" :plugins="[todayLine, referenceLines]" />
+        <template #fallback>
+          <UiSkeleton height="100%" radius="md" />
+        </template>
+      </ClientOnly>
 
       <div
-        v-if="tooltipDay && tooltipIndex >= 0"
+        v-if="tooltip"
         class="cash-flow-chart__tooltip"
-        :style="{
-          left: `${(xFor(tooltipIndex) / width) * 100}%`,
-          top: `${(yFor(tooltipDay.balance) / height) * 100}%`,
-        }"
+        :style="{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }"
       >
-        <strong>Dia {{ tooltipDay.day }}</strong>
-        <p>Saldo: {{ formatMoney(tooltipDay.balance) }}</p>
-        <ul
-          v-if="tooltipDay.movements.length"
-          class="cash-flow-chart__tooltip-list"
-        >
+        <strong>
+          Dia {{ tooltip.day.day }}
+          <span v-if="tooltip.day.isToday">· hoje</span>
+        </strong>
+        <p>Saldo: {{ formatMoney(tooltip.day.balance) }}</p>
+        <ul v-if="tooltip.day.movements.length" class="cash-flow-chart__tooltip-list">
           <li
-            v-for="movement in tooltipDay.movements"
+            v-for="movement in tooltip.day.movements.slice(0, 4)"
             :key="movement.id"
-            :class="{
-              'is-income': movement.signedAmount >= 0,
-              'is-expense': movement.signedAmount < 0,
-            }"
+            :class="movement.signedAmount >= 0 ? 'is-income' : 'is-expense'"
           >
             <span>{{ formatSignedMoney(movement.signedAmount) }}</span>
             {{ movement.description }}
           </li>
+          <li v-if="tooltip.day.movements.length > 4" class="is-more">
+            +{{ tooltip.day.movements.length - 4 }} lançamento(s)
+          </li>
         </ul>
-        <span v-else class="cash-flow-chart__tooltip-empty">
-          Sem lançamentos
-        </span>
+        <span v-else class="cash-flow-chart__tooltip-empty">Sem lançamentos</span>
       </div>
     </div>
 
@@ -396,8 +324,8 @@ function showDot(day: CashFlowDay) {
         Hoje
       </li>
       <li>
-        <span class="cash-flow-chart__swatch cash-flow-chart__swatch--negative" />
-        Saldo negativo
+        <span class="cash-flow-chart__swatch cash-flow-chart__swatch--critical" />
+        Abaixo de {{ formatMoney(threshold) }}
       </li>
     </ul>
   </div>
@@ -405,8 +333,7 @@ function showDot(day: CashFlowDay) {
 
 <style scoped>
 .cash-flow-chart {
-  --cash-flow-line: #1c6db8;
-  --cash-flow-line-soft: color-mix(in srgb, var(--cash-flow-line) 72%, white);
+  --cash-flow-line: var(--color-brand);
 }
 
 .cash-flow-chart__heading {
@@ -427,180 +354,122 @@ function showDot(day: CashFlowDay) {
 
 .cash-flow-chart__plot-wrap {
   position: relative;
-  width: 100%;
-  height: 17rem;
-}
-
-.cash-flow-chart__svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.cash-flow-chart__grid {
-  stroke: var(--color-border);
-  stroke-width: 1;
-  stroke-dasharray: 3 4;
-  opacity: 0.85;
-}
-
-.cash-flow-chart__axis-label {
-  fill: var(--color-ink-muted);
-  font-size: 9.5px;
-}
-
-.cash-flow-chart__line {
-  stroke: var(--cash-flow-line);
-  stroke-width: 2.25;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-
-.cash-flow-chart__line--critical {
-  stroke: var(--color-negative, #e05151);
-}
-
-.cash-flow-chart__today {
-  stroke: var(--cash-flow-line-soft);
-  stroke-width: 1.5;
-  stroke-dasharray: 4 5;
-}
-
-.cash-flow-chart__zero {
-  stroke: var(--color-negative);
-  stroke-width: 1;
-  stroke-dasharray: 4 4;
-  opacity: 0.55;
-}
-
-.cash-flow-chart__negative-band {
-  fill: var(--color-negative-soft);
-  opacity: 0.45;
-}
-
-.cash-flow-chart__point-group {
-  cursor: pointer;
-}
-
-.cash-flow-chart__dot {
-  fill: var(--cash-flow-line);
-  stroke: var(--color-surface);
-  stroke-width: 1.5;
-}
-
-.cash-flow-chart__dot--event {
-  fill: var(--color-positive);
-}
-
-.cash-flow-chart__dot--today,
-.cash-flow-chart__dot--active {
-  fill: #0f4f8c;
-}
-
-.cash-flow-chart__dot--critical {
-  fill: var(--color-negative);
+  height: 15rem;
 }
 
 .cash-flow-chart__tooltip {
   position: absolute;
-  z-index: 2;
-  min-width: 10rem;
+  z-index: 3;
+  min-width: 11rem;
   max-width: 16rem;
-  padding: 0.45rem 0.65rem;
-  border: 1px solid var(--color-border);
+  padding: var(--space-3);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-  transform: translate(-50%, calc(-100% - 10px));
+  background: var(--toast-bg);
+  color: var(--toast-fg);
+  box-shadow: var(--shadow-md);
   pointer-events: none;
+  transform: translate(-50%, calc(-100% - 0.75rem));
 }
 
 .cash-flow-chart__tooltip strong {
-  display: block;
-  color: var(--color-ink);
-  font-size: var(--text-xs);
-}
-
-.cash-flow-chart__tooltip p {
-  margin-top: 0.1rem;
-  color: var(--color-ink);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
 }
 
-.cash-flow-chart__tooltip-empty {
-  display: block;
-  margin-top: 0.2rem;
-  color: var(--color-ink-muted);
-  font-size: 0.6875rem;
+.cash-flow-chart__tooltip strong span {
+  opacity: 0.7;
+  font-weight: var(--weight-regular);
+}
+
+.cash-flow-chart__tooltip p {
+  margin-top: 0.15rem;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
 }
 
 .cash-flow-chart__tooltip-list {
   display: flex;
-  margin: 0.3rem 0 0;
-  padding: 0;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.2rem;
+  padding: var(--space-2) 0 0;
+  margin: var(--space-2) 0 0;
+  border-top: 1px solid rgb(255 255 255 / 15%);
   list-style: none;
 }
 
 .cash-flow-chart__tooltip-list li {
-  display: flex;
-  gap: 0.35rem;
-  color: var(--color-ink-muted);
-  font-size: 0.6875rem;
-  line-height: 1.3;
+  overflow: hidden;
+  font-size: var(--text-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
 }
 
-.cash-flow-chart__tooltip-list li span {
-  flex-shrink: 0;
-  font-weight: var(--weight-semibold);
+.cash-flow-chart__tooltip-list span {
+  margin-right: 0.35rem;
   font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-semibold);
 }
 
-.cash-flow-chart__tooltip-list li.is-income span {
-  color: var(--color-positive-ink);
+.cash-flow-chart__tooltip-list .is-income span {
+  color: #8fd3ac;
 }
 
-.cash-flow-chart__tooltip-list li.is-expense span {
-  color: var(--color-negative-ink);
+.cash-flow-chart__tooltip-list .is-expense span {
+  color: #eda79c;
+}
+
+.cash-flow-chart__tooltip-list .is-more {
+  opacity: 0.6;
+}
+
+.cash-flow-chart__tooltip-empty {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--text-2xs);
+  opacity: 0.65;
 }
 
 .cash-flow-chart__legend {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-4);
-  margin-top: var(--space-2);
-  list-style: none;
-  color: var(--color-ink-secondary);
+  padding: 0;
+  margin: var(--space-3) 0 0;
+  color: var(--color-ink-muted);
   font-size: var(--text-xs);
+  list-style: none;
 }
 
 .cash-flow-chart__legend li {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--space-2);
 }
 
 .cash-flow-chart__swatch {
-  width: 1rem;
-  height: 0.25rem;
-  border-radius: var(--radius-round);
-}
-
-.cash-flow-chart__swatch--line {
+  width: 0.75rem;
+  height: 0.2rem;
+  border-radius: 999px;
   background: var(--cash-flow-line);
 }
 
 .cash-flow-chart__swatch--today {
-  height: 0.85rem;
+  height: 0.75rem;
   width: 0;
-  border-left: 2px dashed var(--cash-flow-line-soft);
+  border-left: 2px dashed var(--cash-flow-line);
+  background: none;
+  border-radius: 0;
 }
 
-.cash-flow-chart__swatch--negative {
-  height: 0.7rem;
-  background: var(--color-negative-soft);
-  border: 1px solid var(--color-negative);
+.cash-flow-chart__swatch--critical {
+  background: var(--color-negative);
+}
+
+@media (max-width: 640px) {
+  .cash-flow-chart__plot-wrap {
+    height: 12rem;
+  }
 }
 </style>
