@@ -191,6 +191,8 @@ console.log(`mudam de cor: ${rows.filter((r) => r.antes !== r.agora).length} de 
 /* ---------- aplicação ---------- */
 
 const apply = process.argv.includes('--apply')
+/** Banco e seed podem estar dessincronizados; --seed-only conserta só o seed. */
+const seedOnly = process.argv.includes('--seed-only')
 const dbArg = process.argv.find((a) => a.startsWith('--db='))
 const dbPath = dbArg ? dbArg.slice('--db='.length) : '.data/lumen.sqlite3'
 
@@ -202,7 +204,8 @@ if (!apply) {
   process.exit(0)
 }
 
-const db = new Database(dbPath, { fileMustExist: true })
+const db = seedOnly ? null : new Database(dbPath, { fileMustExist: true })
+if (seedOnly) console.log('\n--seed-only: banco intocado.')
 
 /**
  * O banco pode estar em dois estados: com as cores originais (nunca migrado)
@@ -211,44 +214,89 @@ const db = new Database(dbPath, { fileMustExist: true })
  * passaria silenciosamente como sucesso.
  */
 const presentes = new Set(
-  db
-    .prepare(
-      'SELECT color FROM categories WHERE color IS NOT NULL UNION SELECT color FROM supercategories WHERE color IS NOT NULL',
-    )
-    .all()
-    .map((r) => r.color),
+  seedOnly
+    ? []
+    : db
+        .prepare(
+          'SELECT color FROM categories WHERE color IS NOT NULL UNION SELECT color FROM supercategories WHERE color IS NOT NULL',
+        )
+        .all()
+        .map((r) => r.color),
 )
+const paletaAtual = new Set(palette.map((p) => p.hex))
+const foraDaPaleta = [...presentes].filter((c) => !paletaAtual.has(c))
 const contaOriginais = rows.filter((r) => presentes.has(r.original)).length
-const contaAnteriores = rows.filter((r) => presentes.has(r.antes)).length
-const deOriginal = contaOriginais > contaAnteriores
 
-console.log(
-  `\nbanco: ${dbPath} — ${deOriginal ? 'cores originais' : 'paleta de 8'} ` +
-    `(${deOriginal ? contaOriginais : contaAnteriores} de ${rows.length} reconhecidas)`,
-)
+/**
+ * Três estados possíveis, e é preciso distinguir os três.
+ *
+ * O script NÃO é idempotente: #5184b1 é destino de um par e origem de outro,
+ * então rodar de novo sobre um banco já convertido moveria cores corretas.
+ * Se nada está fora da paleta atual e nenhuma cor original sobrou, o banco já
+ * está em 0.9 e a única ação segura é não fazer nada.
+ */
+const bancoPronto = !seedOnly && foraDaPaleta.length === 0 && contaOriginais === 0
+if (bancoPronto) {
+  console.log(`\nbanco: ${dbPath} — já está na paleta 0.9, não vou tocar.`)
+  console.log('(rodar de novo moveria cores corretas: o mapeamento encadeia)')
+}
+
+const deOriginal = contaOriginais > 0
+if (!seedOnly && !bancoPronto) {
+  console.log(
+    `\nbanco: ${dbPath} — ${deOriginal ? 'cores originais' : 'paleta de 8'} ` +
+      `(${foraDaPaleta.length} cor(es) fora da paleta atual)`,
+  )
+}
 
 const chave = deOriginal ? 'original' : 'antes'
-const paraAplicar = rows.filter((r) => r[chave] !== r.agora)
 
-for (const table of ['categories', 'supercategories']) {
-  const upd = db.prepare(`UPDATE ${table} SET color = ? WHERE color = ?`)
-  let n = 0
-  const tx = db.transaction((ms) => ms.forEach((m) => { n += upd.run(m.agora, m[chave]).changes }))
-  tx(paraAplicar)
-  console.log(`>> ${table}: ${n} linhas atualizadas`)
+/**
+ * Grava por id, com o destino resolvido em JS — nunca `UPDATE ... WHERE
+ * color = ?` em sequência.
+ *
+ * O mapeamento encadeia: #759cbe -> #5184b1 -> #3a6a97 -> #4d3f9c -> #905996.
+ * Como updates sucessivos por valor, uma linha que virasse #5184b1 seria
+ * pega de novo pelo par seguinte e terminaria em #905996 — azul viraria
+ * ameixa, em silêncio. Resolver linha a linha torna o resultado independente
+ * da ordem de aplicação.
+ */
+const mapa = new Map(rows.filter((r) => r[chave] !== r.agora).map((r) => [r[chave], r.agora]))
+
+for (const table of bancoPronto || seedOnly ? [] : ['categories', 'supercategories']) {
+  const alvos = db
+    .prepare(`SELECT id, color FROM ${table} WHERE color IS NOT NULL`)
+    .all()
+    .filter((r) => mapa.has(r.color))
+    .map((r) => ({ id: r.id, cor: mapa.get(r.color) }))
+
+  const upd = db.prepare(`UPDATE ${table} SET color = ? WHERE id = ?`)
+  const tx = db.transaction((items) => items.forEach((i) => upd.run(i.cor, i.id)))
+  tx(alvos)
+  console.log(`>> ${table}: ${alvos.length} linhas atualizadas`)
 }
-db.close()
+if (db) db.close()
 
-/* Seed: parte das cores originais, então usa o mapeamento completo. */
+/**
+ * Seed: substituição em passe único, pela mesma razão do banco.
+ *
+ * Um `replace` por par, em sequência, cascateia — foi assim que o seed saiu
+ * com Freela em violeta em vez de azul. Um único regex alternado, resolvendo
+ * cada ocorrência pelo mapa, garante que nenhuma cor já convertida seja
+ * reconvertida.
+ */
 const seedFiles = ['server/utils/categorySeedData.ts', 'server/utils/cardInvoice.ts']
+const seedMap = new Map(rows.map((r) => [r.antes.toLowerCase(), r.agora]))
+const seedRe = new RegExp([...seedMap.keys()].join('|'), 'gi')
+
 for (const file of seedFiles) {
-  let text = fs.readFileSync(file, 'utf8')
+  const text = fs.readFileSync(file, 'utf8')
   let n = 0
-  for (const r of rows) {
-    const re = new RegExp(r.antes, 'gi')
-    const hits = (text.match(re) ?? []).length
-    if (hits) { text = text.replace(re, r.agora); n += hits }
-  }
-  fs.writeFileSync(file, text)
-  console.log(`>> ${file}: ${n} cores atualizadas`)
+  const out = text.replace(seedRe, (hit) => {
+    const novo = seedMap.get(hit.toLowerCase())
+    if (novo && novo !== hit.toLowerCase()) n++
+    return novo ?? hit
+  })
+  fs.writeFileSync(file, out)
+  console.log(`>> ${file}: ${n} cores alteradas`)
 }
