@@ -35,10 +35,19 @@ const threshold = computed(() => props.criticalThreshold ?? CRITICAL_FALLBACK)
  * aceita string — não resolve `var()`. Então lemos os valores computados uma
  * vez, quando o componente monta no cliente.
  */
+/**
+ * O trecho crítico usa `clay`, não `--danger`.
+ *
+ * Só a paleta ativa vira token CSS vivo, então clay vem da tabela que o app
+ * já mantém das outras paletas — a mesma que o seletor de categoria usa, e
+ * que `scripts/remap-akoma-0.9.mjs` regenera quando o Akoma sobe de versão.
+ */
+const CRITICAL_COLOR = AKOMA_PALETTE_FAMILIES.clay[2]
+
 const wrapRef = ref<HTMLElement | null>(null)
 const tokens = ref({
   line: '#5184b1',
-  danger: '#9d443a',
+  critical: CRITICAL_COLOR,
   ink: '#213129',
   muted: '#67736b',
   border: 'rgba(33,49,41,.11)',
@@ -52,7 +61,7 @@ onMounted(() => {
   const read = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback
   tokens.value = {
     line: read('--cash-flow-line', tokens.value.line),
-    danger: read('--color-negative', tokens.value.danger),
+    critical: CRITICAL_COLOR,
     ink: read('--color-ink', tokens.value.ink),
     muted: read('--color-ink-muted', tokens.value.muted),
     border: read('--color-border', tokens.value.border),
@@ -87,7 +96,7 @@ const pointRadius = computed(() =>
 
 const pointColor = computed(() =>
   props.days.map((d, i) =>
-    d.isCritical ? tokens.value.danger : i === selectedIndex.value || d.isToday ? tokens.value.line : tokens.value.line,
+    d.isCritical ? tokens.value.critical : tokens.value.line,
   ),
 )
 
@@ -107,7 +116,7 @@ const chartData = computed(() => ({
       segment: {
         borderColor: (ctx: ScriptableLineSegmentContext) => {
           const menor = Math.min(ctx.p0.parsed.y ?? Infinity, ctx.p1.parsed.y ?? Infinity)
-          return menor <= threshold.value ? tokens.value.danger : tokens.value.line
+          return menor <= threshold.value ? tokens.value.critical : tokens.value.line
         },
       },
       backgroundColor: (ctx: { chart: Chart }) => {
@@ -170,14 +179,34 @@ const referenceLines: Plugin<'line'> = {
       ctx.stroke()
       ctx.restore()
     }
-    draw(threshold.value, tokens.value.danger, 0.28, [3, 3])
-    draw(0, tokens.value.danger, 0.5, [6, 3])
+    draw(threshold.value, tokens.value.critical, 0.28, [3, 3])
+    draw(0, tokens.value.critical, 0.5, [6, 3])
   },
 }
 
 /* ---------- tooltip em HTML ---------- */
 
-const tooltip = ref<{ day: CashFlowDay; x: number; y: number } | null>(null)
+const tooltip = ref<{ day: CashFlowDay; x: number; y: number; width: number } | null>(null)
+
+/**
+ * O card do Akoma tem `overflow: hidden`, então o tooltip não pode vazar para
+ * fora da área do gráfico — perto das bordas ele seria cortado. Em vez de
+ * centralizar sempre, a âncora acompanha a posição: à esquerda no início do
+ * gráfico, à direita no fim. E cai para baixo do ponto quando não há espaço
+ * acima.
+ */
+const tooltipStyle = computed(() => {
+  const t = tooltip.value
+  if (!t) return undefined
+  const razao = t.width ? t.x / t.width : 0.5
+  const alinhamento = razao > 0.7 ? 'calc(-100% + 1rem)' : razao < 0.3 ? '-1rem' : '-50%'
+  const abaixo = t.y < 130
+  return {
+    left: `${t.x}px`,
+    top: `${t.y}px`,
+    transform: `translate(${alinhamento}, ${abaixo ? '0.75rem' : 'calc(-100% - 0.75rem)'})`,
+  }
+})
 
 /**
  * Tooltip externo em vez do nativo: o nativo desenha no canvas e não daria a
@@ -196,7 +225,7 @@ function externalTooltip(context: { chart: Chart; tooltip: any }) {
     tooltip.value = null
     return
   }
-  tooltip.value = { day, x: model.caretX, y: model.caretY }
+  tooltip.value = { day, x: model.caretX, y: model.caretY, width: context.chart.width }
 }
 
 const chartOptions = computed<ChartOptions<'line'>>(() => ({
@@ -266,7 +295,18 @@ function formatSignedMoney(value: number) {
 </script>
 
 <template>
-  <div ref="wrapRef" class="cash-flow-chart">
+  <!--
+    A série de dados usa ocean, não o accent do app. O guia do Akoma reserva
+    o accent para chrome (page label, nav ativa), e uma linha de gráfico não
+    é chrome — escopar o data-accent aqui dá a cor da paleta sem hex cravado
+    e sem arrastar o resto da interface junto.
+  -->
+  <div
+    ref="wrapRef"
+    class="cash-flow-chart"
+    data-accent="ocean"
+    :style="{ '--cash-flow-critical': CRITICAL_COLOR }"
+  >
     <div class="cash-flow-chart__heading">
       <h2>Saldo dia a dia</h2>
       <p>
@@ -290,7 +330,7 @@ function formatSignedMoney(value: number) {
       <div
         v-if="tooltip"
         class="cash-flow-chart__tooltip"
-        :style="{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }"
+        :style="tooltipStyle"
       >
         <strong>
           Dia {{ tooltip.day.day }}
@@ -332,8 +372,13 @@ function formatSignedMoney(value: number) {
 </template>
 
 <style scoped>
+/**
+ * `--accent` direto, não `--color-brand`: o alias é declarado no :root e
+ * congela lá o valor computado, então não acompanharia o data-accent
+ * escopado neste elemento.
+ */
 .cash-flow-chart {
-  --cash-flow-line: var(--color-brand);
+  --cash-flow-line: var(--accent);
 }
 
 .cash-flow-chart__heading {
@@ -368,7 +413,6 @@ function formatSignedMoney(value: number) {
   color: var(--toast-fg);
   box-shadow: var(--shadow-md);
   pointer-events: none;
-  transform: translate(-50%, calc(-100% - 0.75rem));
 }
 
 .cash-flow-chart__tooltip strong {
@@ -464,7 +508,7 @@ function formatSignedMoney(value: number) {
 }
 
 .cash-flow-chart__swatch--critical {
-  background: var(--color-negative);
+  background: var(--cash-flow-critical);
 }
 
 @media (max-width: 640px) {
