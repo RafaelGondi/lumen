@@ -28,10 +28,16 @@ const PREVIOUS = {
 
 const SHADES = ['lighter', 'light', 'base', 'dark', 'darker']
 
-/** Lê a paleta direto do pacote instalado — sem hex transcrito à mão. */
+/**
+ * Lê a paleta direto do pacote instalado — sem hex transcrito à mão.
+ *
+ * `--palette=` existe para rodar em produção, onde o app é servido do bundle
+ * e o akoma não está em node_modules.
+ */
 function readPalettes() {
+  const arg = process.argv.find((a) => a.startsWith('--palette='))
   const css = fs.readFileSync(
-    'node_modules/@rafael_dias/akoma/src/styles/accent-palettes.css',
+    arg ? arg.slice('--palette='.length) : 'node_modules/@rafael_dias/akoma/src/styles/accent-palettes.css',
     'utf8',
   )
   const ids = [...css.matchAll(/^\[data-accent='([a-z]+)'\] \{/gm)].map((m) => m[1])
@@ -196,15 +202,13 @@ const seedOnly = process.argv.includes('--seed-only')
 const dbArg = process.argv.find((a) => a.startsWith('--db='))
 const dbPath = dbArg ? dbArg.slice('--db='.length) : '.data/lumen.sqlite3'
 
-/** O banco guarda o resultado da migração anterior, então a chave é `antes`. */
-const dbMap = rows.filter((r) => r.antes !== r.agora)
-
-if (!apply) {
-  console.log(`\n(dry-run — ${dbMap.length} cores a trocar no banco; use --apply)`)
-  process.exit(0)
-}
-
-const db = seedOnly ? null : new Database(dbPath, { fileMustExist: true })
+/**
+ * O banco é aberto mesmo em dry-run, e de propósito: sem inspecionar o banco
+ * de verdade o dry-run só mostraria o mapeamento teórico, sem dizer o que
+ * aconteceria com AQUELE arquivo. Antes de escrever em produção é justamente
+ * isso que precisa ser conferido.
+ */
+const db = seedOnly ? null : new Database(dbPath, { readonly: !apply, fileMustExist: true })
 if (seedOnly) console.log('\n--seed-only: banco intocado.')
 
 /**
@@ -265,10 +269,16 @@ const mapa = new Map(rows.filter((r) => r[chave] !== r.agora).map((r) => [r[chav
 
 for (const table of bancoPronto || seedOnly ? [] : ['categories', 'supercategories']) {
   const alvos = db
-    .prepare(`SELECT id, color FROM ${table} WHERE color IS NOT NULL`)
+    .prepare(`SELECT id, name, color FROM ${table} WHERE color IS NOT NULL`)
     .all()
     .filter((r) => mapa.has(r.color))
-    .map((r) => ({ id: r.id, cor: mapa.get(r.color) }))
+    .map((r) => ({ id: r.id, nome: r.name, de: r.color, cor: mapa.get(r.color) }))
+
+  if (!apply) {
+    console.log(`\n${table}: ${alvos.length} linha(s) mudariam`)
+    for (const a of alvos) console.log(`   ${a.de} -> ${a.cor}  ${a.nome}`)
+    continue
+  }
 
   const upd = db.prepare(`UPDATE ${table} SET color = ? WHERE id = ?`)
   const tx = db.transaction((items) => items.forEach((i) => upd.run(i.cor, i.id)))
@@ -289,7 +299,15 @@ const seedFiles = ['server/utils/categorySeedData.ts', 'server/utils/cardInvoice
 const seedMap = new Map(rows.map((r) => [r.antes.toLowerCase(), r.agora]))
 const seedRe = new RegExp([...seedMap.keys()].join('|'), 'gi')
 
-for (const file of seedFiles) {
+/**
+ * Só grava com --apply, e só quando o seed é alcançável a partir do diretório
+ * atual. Em produção o app roda do bundle e estes arquivos não existem.
+ */
+for (const file of apply ? seedFiles : []) {
+  if (!fs.existsSync(file)) {
+    console.log(`>> ${file}: ausente, ignorado`)
+    continue
+  }
   const text = fs.readFileSync(file, 'utf8')
   let n = 0
   const out = text.replace(seedRe, (hit) => {
@@ -297,6 +315,10 @@ for (const file of seedFiles) {
     if (novo && novo !== hit.toLowerCase()) n++
     return novo ?? hit
   })
+  if (n === 0) {
+    console.log(`>> ${file}: nada a alterar`)
+    continue
+  }
   fs.writeFileSync(file, out)
   console.log(`>> ${file}: ${n} cores alteradas`)
 }
