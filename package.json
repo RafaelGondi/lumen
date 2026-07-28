@@ -21,7 +21,7 @@
     "@edusites/bancos-brasil": "^1.2.0",
     "@lucide/vue": "^1.24.0",
     "@nuxt/fonts": "^0.14.0",
-    "@rafael_dias/akoma": "^0.8.11",
+    "@rafael_dias/akoma": "^0.9.0",
     "@sysvale/cuida-icons": "^1.18.0",
     "better-sqlite3": "^12.11.1",
     "nuxt": "^3.21.8",
