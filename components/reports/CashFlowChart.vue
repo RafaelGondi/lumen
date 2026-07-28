@@ -399,7 +399,7 @@ function formatSignedMoney(value: number) {
 
 .cash-flow-chart__plot-wrap {
   position: relative;
-  height: 15rem;
+  height: 19rem;
 }
 
 .cash-flow-chart__tooltip {
@@ -513,7 +513,7 @@ function formatSignedMoney(value: number) {
 
 @media (max-width: 640px) {
   .cash-flow-chart__plot-wrap {
-    height: 12rem;
+    height: 15rem;
   }
 }
 </style>
