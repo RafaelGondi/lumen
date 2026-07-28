@@ -23,6 +23,14 @@ defineEmits<{
         <template v-if="category.supercategoryName">
           · {{ category.supercategoryName }}
         </template>
+        <!--
+          Sem supercategoria é pendência, não erro: --warning em vez de
+          --danger, e dito por extenso em vez de um ícone solto, para a
+          ausência ser legível sem precisar comparar com os cards vizinhos.
+        -->
+        <template v-else>
+          · <span class="category-card__orphan">sem supercategoria</span>
+        </template>
       </p>
     </div>
 
@@ -81,6 +89,11 @@ defineEmits<{
   font-size: 0.6875rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.category-card__orphan {
+  color: var(--color-warning);
+  font-weight: var(--weight-medium);
 }
 
 .category-card__actions {

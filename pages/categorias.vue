@@ -38,16 +38,38 @@ const typeFilterOptions: { value: TypeFilter; label: string }[] = [
   { value: 'transfer', label: 'Transferências' },
 ]
 
+/** Filtro à parte do tipo: são dimensões independentes e combinam. */
+const onlyOrphans = ref(false)
+
+function matchesType(category: Category) {
+  return typeFilter.value === 'all' || category.type === typeFilter.value
+}
+
+/**
+ * Conta dentro do tipo selecionado, não no total: com "Receitas" ativo, um
+ * número que incluísse despesas não bateria com o que a lista mostraria.
+ */
+const orphanCount = computed(
+  () =>
+    categories.value.filter(
+      (category) => matchesType(category) && !category.supercategoryId,
+    ).length,
+)
+
 const filteredCategories = computed(() => {
   const term = search.value.trim().toLowerCase()
 
   return categories.value.filter((category) => {
-    if (typeFilter.value !== 'all' && category.type !== typeFilter.value) {
-      return false
-    }
+    if (!matchesType(category)) return false
+    if (onlyOrphans.value && category.supercategoryId) return false
 
     return !term || category.name.toLowerCase().includes(term)
   })
+})
+
+/** Sair de um tipo sem pendências deixaria a lista vazia sem explicação. */
+watch(orphanCount, (count) => {
+  if (count === 0) onlyOrphans.value = false
 })
 
 const categoryDrawerOpen = ref(false)
@@ -128,6 +150,19 @@ async function removeSupercategory(supercategory: Supercategory) {
           />
         </div>
         <UiSegmentedControl v-model="typeFilter" :options="typeFilterOptions" />
+
+        <button
+          v-if="orphanCount"
+          type="button"
+          class="categories-orphans"
+          :class="{ 'categories-orphans--on': onlyOrphans }"
+          :aria-pressed="onlyOrphans"
+          @click="onlyOrphans = !onlyOrphans"
+        >
+          <FolderTree aria-hidden="true" />
+          Sem supercategoria
+          <span>{{ orphanCount }}</span>
+        </button>
       </div>
 
       <div v-if="categoriesPending" class="categories-grid" aria-hidden="true">
@@ -224,10 +259,63 @@ async function removeSupercategory(supercategory: Supercategory) {
 
 .categories-toolbar {
   display: flex;
+  flex-wrap: wrap;
   margin: var(--space-5) 0;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-3) var(--space-4);
+}
+
+/**
+ * Fica desligado por padrão e some quando não há pendência: é uma tarefa a
+ * fazer, não um estado permanente da tela.
+ */
+.categories-orphans {
+  display: inline-flex;
+  min-height: 2.5rem;
+  padding: 0 var(--space-3);
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.categories-orphans svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.categories-orphans span {
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.categories-orphans:hover {
+  border-color: var(--color-ink-muted);
+  color: var(--color-ink);
+}
+
+.categories-orphans--on {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  color: var(--color-brand-ink);
+}
+
+.categories-orphans--on span {
+  background: var(--color-surface);
 }
 
 .categories-toolbar__search {
