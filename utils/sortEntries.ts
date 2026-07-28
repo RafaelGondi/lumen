@@ -2,12 +2,26 @@ export type EntrySortKey = 'date' | 'name' | 'amount' | 'category'
 
 export type EntrySortable = {
   date: string
+  /**
+   * Data da compra original, quando difere da data da cobrança.
+   *
+   * Só as parceladas preenchem: a parcela 2/3 de uma compra de junho é
+   * cobrada em agosto, e ordenar por agosto a colocaria no topo como se
+   * fosse a compra mais recente da fatura. Opcional — quem não informa
+   * continua ordenando por `date`.
+   */
+  purchaseDate?: string | null
   description: string
   amount: number
   categoryName?: string | null
   categoryId?: number | null
   categoryIcon?: string | null
   categoryColor?: string | null
+}
+
+/** Data que ordena: a da compra quando existe, senão a da cobrança. */
+function sortDateOf(entry: EntrySortable) {
+  return entry.purchaseDate || entry.date
 }
 
 export type EntryCategoryGroup<T extends EntrySortable = EntrySortable> = {
@@ -45,7 +59,7 @@ export function sortEntries<T extends EntrySortable>(
   return [...entries].sort((left, right) => {
     let primary = 0
     if (key === 'date') {
-      primary = compareText(left.date, right.date)
+      primary = compareText(sortDateOf(left), sortDateOf(right))
     } else if (key === 'name') {
       primary = compareText(left.description, right.description)
     } else if (key === 'amount') {
@@ -58,7 +72,7 @@ export function sortEntries<T extends EntrySortable>(
     }
     if (primary !== 0) return primary * factor
     // Desempate estável: data mais recente, depois nome.
-    const byDate = compareText(right.date, left.date)
+    const byDate = compareText(sortDateOf(right), sortDateOf(left))
     if (byDate !== 0) return byDate
     return compareText(left.description, right.description)
   })

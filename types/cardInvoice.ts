@@ -26,6 +26,14 @@ export interface CardInvoiceEntry {
   notes: string | null
   /** YYYY-MM-DD */
   date: string
+  /**
+   * Data da compra original, YYYY-MM-DD.
+   *
+   * Em parceladas difere de `date`: a parcela 2/3 de uma compra de junho é
+   * cobrada em agosto, mas foi comprada em junho. É esta data que ordena a
+   * lista, para a compra antiga não aparecer como a mais recente.
+   */
+  purchaseDate: string
   amount: number
   statementName: string | null
   recurrence: 'single' | 'installment' | 'fixed'

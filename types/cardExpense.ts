@@ -50,6 +50,15 @@ export interface CardExpenseOccurrence {
   description: string
   amount: number
   date: string
+  /**
+   * Data da compra original, YYYY-MM-DD.
+   *
+   * Em parceladas, `date` é a data da cobrança nesta fatura — a parcela 2/3
+   * de uma compra de junho cai em agosto. Esta é a data em que a compra
+   * aconteceu de fato, que é o que faz sentido para ordenar por "quando
+   * comprei". Nas demais recorrências as duas coincidem.
+   */
+  purchaseDate: string
   categoryId: number | null
   categoryName: string | null
   categoryColor: string | null

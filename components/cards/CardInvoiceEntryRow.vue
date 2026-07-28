@@ -3,11 +3,24 @@ import { Copy, Layers, Pencil, Receipt, Trash2 } from '@lucide/vue'
 import type { CardInvoiceDetail } from '~/types/cardInvoice'
 import { formatDateBr } from '~/utils/dateMoney'
 
-defineProps<{
+const props = defineProps<{
   entry: CardInvoiceDetail['entries'][number]
   /** No agrupamento por categoria, omite ícone e nome da categoria. */
   compact?: boolean
 }>()
+
+/**
+ * A lista ordena pela data da compra, então é ela que a linha mostra. Em
+ * parceladas a cobrança cai num mês posterior, e sem exibir as duas a lista
+ * pareceria fora de ordem — uma parcela de julho abaixo de uma compra de
+ * junho. Nas demais recorrências as datas coincidem e o sufixo some.
+ */
+const chargeDay = computed(() => {
+  const { purchaseDate, date } = props.entry
+  if (!purchaseDate || purchaseDate === date) return null
+  const [, month, day] = date.split('-')
+  return `${day}/${month}`
+})
 
 defineEmits<{
   duplicate: []
@@ -53,7 +66,8 @@ defineEmits<{
         </span>
       </div>
       <span>
-        {{ formatDateBr(entry.date) }}
+        {{ formatDateBr(entry.purchaseDate || entry.date) }}
+        <template v-if="chargeDay"> · cobra {{ chargeDay }}</template>
         <template v-if="!compact && entry.categoryName">
           · {{ entry.categoryName }}
         </template>

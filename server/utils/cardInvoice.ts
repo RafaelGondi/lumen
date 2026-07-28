@@ -82,6 +82,7 @@ function invoiceEntries(
       description: occurrence.description,
       notes: occurrence.notes,
       date: occurrence.date,
+      purchaseDate: occurrence.purchaseDate,
       amount: occurrence.amount,
       statementName: occurrence.statementName,
       recurrence: occurrence.recurrence,

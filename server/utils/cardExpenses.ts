@@ -214,6 +214,12 @@ function deriveOccurrence(
             index,
             Boolean(parent.useMonthEnd),
           ),
+    /**
+     * Sempre a data do pai: é quando a compra aconteceu. Não recebe o
+     * deslocamento de meses nem a exceção de vencimento, que dizem respeito
+     * à cobrança, não à compra.
+     */
+    purchaseDate: parent.date,
     categoryId,
     categoryName:
       categoryId === parent.categoryId
