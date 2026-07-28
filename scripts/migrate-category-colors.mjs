@@ -106,7 +106,16 @@ const lab = (hex) => {
 }
 
 const apply = process.argv.includes('--apply')
-const db = new Database('.data/lumen.sqlite3', { readonly: !apply })
+
+/**
+ * Caminho explícito em vez de relativo: em produção o banco está em
+ * /app/.data e um erro de diretório de trabalho apontaria para a base errada.
+ */
+const dbArg = process.argv.find((a) => a.startsWith('--db='))
+const dbPath = dbArg ? dbArg.slice('--db='.length) : '.data/lumen.sqlite3'
+console.log(`banco: ${dbPath}${apply ? ' (ESCRITA)' : ' (somente leitura)'}\n`)
+
+const db = new Database(dbPath, { readonly: !apply, fileMustExist: true })
 
 const TABLES = ['categories', 'supercategories']
 
