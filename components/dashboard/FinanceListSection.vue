@@ -210,16 +210,18 @@ function openItem(item: FinanceListItem) {
         </div>
       </section>
 
-      <footer class="finance-list__total">
-        <span>{{ totalLabel }}</span>
-        <strong
-          class="numeric"
-          :class="`finance-list__total-value--${kind}`"
-        >
-          <UiMoney :value="section.total" />
-        </strong>
-      </footer>
     </div>
+
+    <!--
+      Fora do corpo que rola: o total é a leitura principal do card e some
+      da tela se acompanhar a rolagem da lista.
+    -->
+    <footer v-if="section.itemCount" class="finance-list__total">
+      <span>{{ totalLabel }}</span>
+      <strong class="numeric" :class="`finance-list__total-value--${kind}`">
+        <UiMoney :value="section.total" />
+      </strong>
+    </footer>
 
     <UiEmptyState
       v-else
@@ -249,6 +251,7 @@ function openItem(item: FinanceListItem) {
   justify-content: space-between;
   gap: var(--space-3);
   border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
 }
 
 .finance-list__title-line {
@@ -319,11 +322,21 @@ function openItem(item: FinanceListItem) {
   margin-left: var(--space-1);
 }
 
+/**
+ * Única região que rola. O teto é do corpo, não do card, para o cabeçalho e
+ * o total ficarem sempre visíveis — sem ele a lista crescia indefinidamente
+ * e empurrava o resto da home para baixo.
+ *
+ * 24rem cabem ~7 linhas de 3,5rem mais os subtotais: o suficiente para a
+ * lista ter contexto sem dominar a página.
+ */
 .finance-list__body {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
+  max-height: 24rem;
+  overflow-y: auto;
   padding-bottom: var(--space-2);
 }
 
@@ -475,6 +488,11 @@ function openItem(item: FinanceListItem) {
   font-weight: var(--weight-medium);
 }
 
+/**
+ * `margin-top: auto` ancora no fim do card, não da lista: quando o grid
+ * estica este card para acompanhar o vizinho mais alto, o total desce junto
+ * em vez de deixar um vão embaixo.
+ */
 .finance-list__total {
   display: flex;
   margin: auto var(--space-5) var(--space-3);
@@ -484,6 +502,7 @@ function openItem(item: FinanceListItem) {
   border-top: 1px solid var(--color-border);
   color: var(--color-ink-secondary);
   font-size: var(--text-sm);
+  flex-shrink: 0;
 }
 
 .finance-list__total strong {
