@@ -11,7 +11,27 @@
  */
 import fs from 'node:fs'
 import Database from 'better-sqlite3'
-import { AKOMA_ACCENT } from '../utils/theme.ts'
+
+/**
+ * Lê o accent do theme.ts como texto, não por import.
+ *
+ * O Node do servidor é v20 e não carrega `.ts`, e o caminho relativo do
+ * import quebraria ao rodar o script de outro diretório. `--accent=` cobre
+ * o caso de o arquivo não estar por perto.
+ */
+function readAccent() {
+  const arg = process.argv.find((a) => a.startsWith('--accent='))
+  if (arg) return arg.slice('--accent='.length)
+  for (const p of ['utils/theme.ts', new URL('../utils/theme.ts', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')]) {
+    try {
+      const m = fs.readFileSync(p, 'utf8').match(/AKOMA_ACCENT\s*=\s*['"]([a-z]+)['"]/)
+      if (m) return m[1]
+    } catch {}
+  }
+  throw new Error('accent não encontrado — passe --accent=<paleta>')
+}
+
+const AKOMA_ACCENT = readAccent()
 
 const SHADES = ['lighter', 'light', 'base', 'dark', 'darker']
 
