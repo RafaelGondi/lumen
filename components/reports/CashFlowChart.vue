@@ -298,13 +298,14 @@ function formatSignedMoney(value: number) {
   <!--
     A série de dados usa ocean, não o accent do app. O guia do Akoma reserva
     o accent para chrome (page label, nav ativa), e uma linha de gráfico não
-    é chrome — escopar o data-accent aqui dá a cor da paleta sem hex cravado
+    é chrome. Precisa ser uma paleta diferente da ativa: com a mesma, a linha
+    volta a ter a cor dos botões e da nav. Escopar o data-accent aqui dá a cor
     e sem arrastar o resto da interface junto.
   -->
   <div
     ref="wrapRef"
     class="cash-flow-chart"
-    data-accent="ocean"
+    data-accent="sea"
     :style="{ '--cash-flow-critical': CRITICAL_COLOR }"
   >
     <div class="cash-flow-chart__heading">

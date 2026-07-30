@@ -5,4 +5,4 @@
  * silêncio, caindo no accent padrão do design system.
  */
 export const AKOMA_MOOD = 'site'
-export const AKOMA_ACCENT = 'slate'
+export const AKOMA_ACCENT = 'ocean'
