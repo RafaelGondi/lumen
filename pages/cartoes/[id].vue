@@ -372,29 +372,22 @@ async function onPaymentSaved() {
     </div>
 
     <div v-else class="card-detail-page">
-      <header class="card-detail-header">
-        <div>
-          <button
-            type="button"
-            class="card-detail-header__back"
-            @click="navigateTo('/cartoes')"
-          >
-            <ArrowLeft aria-hidden="true" />
-            <span>{{ card.name }}</span>
-          </button>
-          <p class="card-detail-header__meta">
-            {{ card.bankName }}
-            <span aria-hidden="true">•</span>
-            Vence dia {{ card.dueDay }}
-            <span aria-hidden="true">•</span>
-            Fechamento dia {{ card.closingDay }}
-          </p>
-        </div>
-        <UiButton @click="openExpenseDrawer(null)">
-          <template #leading><Plus /></template>
-          Nova despesa
-        </UiButton>
-      </header>
+      <PageHeading
+        eyebrow="Financeiro / Cartões"
+        :title="card.name"
+        :description="`${card.bankName} · Vence dia ${card.dueDay} · Fechamento dia ${card.closingDay}`"
+      >
+        <template #actions>
+          <UiButton variant="secondary" @click="navigateTo('/cartoes')">
+            <template #leading><ArrowLeft /></template>
+            Cartões
+          </UiButton>
+          <UiButton @click="openExpenseDrawer(null)">
+            <template #leading><Plus /></template>
+            Nova despesa
+          </UiButton>
+        </template>
+      </PageHeading>
 
       <DashboardSpendingImpactNotice
         v-if="spendingImpact"
@@ -772,42 +765,6 @@ async function onPaymentSaved() {
 
 .card-missing {
   margin-top: var(--space-8);
-}
-
-.card-detail-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.card-detail-header__back {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  border: 0;
-  background: transparent;
-  color: var(--color-ink);
-  font-size: var(--text-xl);
-  font-weight: var(--weight-semibold);
-  letter-spacing: -0.02em;
-  cursor: pointer;
-}
-
-.card-detail-header__back svg {
-  width: 1.15rem;
-  height: 1.15rem;
-  color: var(--color-ink-muted);
-}
-
-.card-detail-header__meta {
-  display: flex;
-  flex-wrap: wrap;
-  margin-top: var(--space-2);
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-sm);
 }
 
 .card-face {
