@@ -43,13 +43,18 @@ const parts = computed(() => {
 
 .ui-money__symbol {
   margin-right: 0.3em;
-  font-size: 0.62em;
+  /*
+   * 0.62em sozinho fica ilegível sobre texto pequeno (ex.: 6.8px sobre
+   * --text-2xs). max() mantém a proporção em textos grandes mas nunca cai
+   * abaixo do menor tamanho da escala do Akoma.
+   */
+  font-size: max(var(--text-2xs), 0.62em);
   font-weight: var(--weight-medium);
   opacity: 0.62;
 }
 
 .ui-money__decimals {
-  font-size: 0.72em;
+  font-size: max(var(--text-2xs), 0.72em);
   font-weight: var(--weight-medium);
   opacity: 0.62;
 }
