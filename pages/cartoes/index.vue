@@ -213,7 +213,6 @@ async function removeCard(card: Card) {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
-  box-shadow: var(--shadow-xs);
 }
 
 .cards-summary__stats {

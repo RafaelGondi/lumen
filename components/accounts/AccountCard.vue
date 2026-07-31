@@ -65,16 +65,12 @@ defineEmits<{
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
-  box-shadow: var(--shadow-xs);
   cursor: pointer;
-  transition:
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast);
+  transition: border-color var(--transition-fast);
 }
 
 .account-card:hover {
   border-color: var(--color-border-strong);
-  box-shadow: var(--shadow-sm);
 }
 
 .account-card__top {

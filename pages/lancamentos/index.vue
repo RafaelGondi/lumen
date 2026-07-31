@@ -509,7 +509,6 @@ function itemMeta(item: SpendingCalendarItem) {
 
 .calendar-day:not(:disabled):hover {
   border-color: var(--color-border-strong);
-  box-shadow: var(--shadow-xs);
 }
 
 .calendar-day--spend {
@@ -583,7 +582,6 @@ function itemMeta(item: SpendingCalendarItem) {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 

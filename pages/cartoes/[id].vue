@@ -775,7 +775,6 @@ async function onPaymentSaved() {
   justify-content: space-between;
   border-radius: var(--radius-lg);
   color: white;
-  box-shadow: var(--shadow-sm);
 }
 
 .card-face__top,
