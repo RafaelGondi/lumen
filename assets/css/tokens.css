@@ -44,9 +44,18 @@
   --color-negative: var(--danger);
   --color-negative-ink: var(--danger);
   --color-negative-soft: var(--danger-soft);
+  /**
+   * --color-warning e --color-info nunca tiveram alias: o Akoma nomeia os
+   * tokens --warning e --info, sem o prefixo `color-`. Sem isto, todo
+   * var(--color-warning) sem fallback próprio resolvia para nada — a
+   * propriedade inteira ficava inválida e o navegador usava o valor
+   * herdado. Foi assim que o marcador "sem supercategoria" saiu cinza em
+   * vez de laranja.
+   */
+  --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
   --color-info-soft: var(--info-soft);
-  /* --color-warning e --color-info já existem no Akoma com o mesmo nome */
 
   /**
    * Branco absoluto, não entrada de paleta: serve de tinta sobre superfícies

@@ -57,9 +57,9 @@ function formatMoney(value: number) {
 
 <style scoped>
 .last-installments {
-  border: 1px solid color-mix(in srgb, var(--color-warning, #e6a548) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-warning, #e6a548) 8%, var(--color-surface));
+  background: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface));
   overflow: hidden;
 }
 
@@ -109,7 +109,7 @@ function formatMoney(value: number) {
 }
 
 .last-installments__body {
-  border-top: 1px solid color-mix(in srgb, var(--color-warning, #e6a548) 25%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--color-warning) 25%, transparent);
 }
 
 .last-installments__row {
@@ -118,7 +118,7 @@ function formatMoney(value: number) {
   grid-template-rows: auto auto;
   gap: 0.1rem var(--space-4);
   padding: var(--space-3) var(--space-5);
-  border-bottom: 1px solid color-mix(in srgb, var(--color-warning, #e6a548) 15%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-warning) 15%, transparent);
 }
 
 .last-installments__row:last-child {

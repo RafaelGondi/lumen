@@ -34,7 +34,13 @@ const visibleItems = computed(() => {
     {
       id: '__others__',
       name: `+${rest.length} ${props.othersLabel}`,
-      color: '#9aa3af',
+      /**
+       * "Outros" é sintético, sem categoria real por trás — não há cor de
+       * paleta que faça sentido. var() resolve normalmente no atributo
+       * `fill` do SVG (cascata de CSS moderna), então usa o token neutro em
+       * vez de um hex cravado que ficaria preso ao tema claro.
+       */
+      color: 'var(--color-ink-muted)',
       amount,
       percent,
     },
@@ -234,8 +240,8 @@ function setHovered(id: string | null) {
   min-width: 7.5rem;
   padding: var(--space-3);
   border-radius: var(--radius-md);
-  background: #151b24;
-  color: white;
+  background: var(--toast-bg);
+  color: var(--toast-fg);
   box-shadow: var(--shadow-md);
   pointer-events: none;
   white-space: nowrap;

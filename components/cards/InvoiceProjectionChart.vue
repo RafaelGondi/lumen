@@ -325,8 +325,8 @@ function barHeight(amount: number) {
   min-width: 7.5rem;
   padding: var(--space-3);
   border-radius: var(--radius-md);
-  background: #151b24;
-  color: white;
+  background: var(--toast-bg);
+  color: var(--toast-fg);
   box-shadow: var(--shadow-md);
   pointer-events: none;
   transform: translateX(-50%);
