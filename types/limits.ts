@@ -30,6 +30,37 @@ export interface LimitRow {
   recurring: boolean
 }
 
+export type LimitBreakdownSource = 'account' | 'card'
+
+export interface LimitBreakdownItem {
+  id: string
+  parentId: number
+  source: LimitBreakdownSource
+  sourceLabel: string | null
+  date: string
+  description: string
+  amount: number
+  originalAmount: number
+  recurrence: 'single' | 'installment' | 'fixed'
+  installmentCount: number | null
+  categoryId: number | null
+  categoryName: string | null
+  categoryColor: string | null
+  categoryIcon: string | null
+}
+
+export interface LimitBreakdownReport {
+  month: string
+  scope: LimitScope
+  referenceId: number
+  label: string
+  color: string
+  icon: string
+  spent: number
+  limitAmount: number | null
+  items: LimitBreakdownItem[]
+  sourceTotals: Record<LimitBreakdownSource, number>
+}
 export interface LimitsReport {
   month: string
   fullLabel: string

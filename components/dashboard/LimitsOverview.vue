@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ArrowRight, BarChart3 } from '@lucide/vue'
-import type { LimitRow, LimitScope, LimitsReport } from '~/types/limits'
+import type { LimitBreakdownReport, LimitRow, LimitScope, LimitsReport } from '~/types/limits'
+
+defineOptions({ inheritAttrs: false })
 
 const props = defineProps<{ month: string }>()
 
@@ -108,10 +110,44 @@ function rowPercent(row: LimitRow) {
 function isOver(row: LimitRow) {
   return row.limitAmount !== null && row.spent > row.limitAmount
 }
+
+const breakdownOpen = ref(false)
+const breakdownPending = ref(false)
+const selectedBreakdown = ref<LimitBreakdownReport | null>(null)
+
+async function openBreakdown(row: OverviewRow) {
+  breakdownOpen.value = true
+  breakdownPending.value = true
+  selectedBreakdown.value = null
+
+  try {
+    selectedBreakdown.value = await $fetch<LimitBreakdownReport>(
+      '/api/limits/breakdown',
+      {
+        query: {
+          month: props.month,
+          scope: row.scope,
+          referenceId: row.referenceId,
+        },
+      },
+    )
+  } finally {
+    breakdownPending.value = false
+  }
+}
+
+watch(
+  () => props.month,
+  () => {
+    breakdownOpen.value = false
+    selectedBreakdown.value = null
+  },
+)
 </script>
 
 <template>
-  <UiCard class="limits-overview" padding="none">
+  <div v-bind="$attrs" class="limits-overview-shell">
+    <UiCard class="limits-overview" padding="none">
     <header class="limits-overview__header">
       <div class="limits-overview__title">
         <span class="limits-overview__icon" aria-hidden="true">
@@ -174,36 +210,43 @@ function isOver(row: LimitRow) {
 
       <ul class="limits-overview__list">
         <li v-for="row in displayRows" :key="row.rowKey">
-          <CategoriesCategoryIconChip
-            :icon="row.icon"
-            :color="row.color"
-            size="sm"
-          />
-          <div class="limits-overview__row-copy">
-            <strong>
-              {{ row.label }}
-              <span class="limits-overview__scope">
-                {{ row.scope === 'supercategory' ? 'Super' : 'Cat.' }}
-              </span>
-            </strong>
-            <div
-              class="limits-overview__row-track"
-              :class="{ 'is-danger': isOver(row) }"
-            >
-              <span
-                :style="{
-                  width: `${rowPercent(row)}%`,
-                  background: isOver(row) ? undefined : row.color,
-                }"
-              />
+          <button
+            type="button"
+            class="limits-overview__row-button"
+            :aria-label="`Ver compras que consomem o limite de ${row.label}`"
+            @click="openBreakdown(row)"
+          >
+            <CategoriesCategoryIconChip
+              :icon="row.icon"
+              :color="row.color"
+              size="sm"
+            />
+            <div class="limits-overview__row-copy">
+              <strong>
+                {{ row.label }}
+                <span class="limits-overview__scope">
+                  {{ row.scope === 'supercategory' ? 'Super' : 'Cat.' }}
+                </span>
+              </strong>
+              <div
+                class="limits-overview__row-track"
+                :class="{ 'is-danger': isOver(row) }"
+              >
+                <span
+                  :style="{
+                    width: `${rowPercent(row)}%`,
+                    background: isOver(row) ? undefined : row.color,
+                  }"
+                />
+              </div>
             </div>
-          </div>
-          <div class="limits-overview__row-amounts">
-            <strong :class="{ 'is-danger': isOver(row) }">
-              <UiMoney :value="row.spent" />
-            </strong>
-            <span>de <UiMoney :value="row.limitAmount!" /></span>
-          </div>
+            <div class="limits-overview__row-amounts">
+              <strong :class="{ 'is-danger': isOver(row) }">
+                <UiMoney :value="row.spent" />
+              </strong>
+              <span>de <UiMoney :value="row.limitAmount!" /></span>
+            </div>
+          </button>
         </li>
       </ul>
 
@@ -215,10 +258,21 @@ function isOver(row: LimitRow) {
         </NuxtLink>
       </footer>
     </template>
-  </UiCard>
+    </UiCard>
+  </div>
+
+  <DashboardLimitBreakdownDrawer
+    v-model:open="breakdownOpen"
+    :report="selectedBreakdown"
+    :pending="breakdownPending"
+  />
 </template>
 
 <style scoped>
+.limits-overview-shell {
+  margin-top: var(--space-5);
+}
+
 .limits-overview__header,
 .limits-overview__body,
 .limits-overview__empty,
@@ -353,11 +407,22 @@ function isOver(row: LimitRow) {
   list-style: none;
 }
 
-.limits-overview__list li {
+.limits-overview__row-button {
   display: grid;
+  width: 100%;
   align-items: start;
   gap: var(--space-3);
   grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.limits-overview__row-button:hover .limits-overview__row-copy strong {
+  color: var(--color-brand);
 }
 
 .limits-overview__row-copy strong {

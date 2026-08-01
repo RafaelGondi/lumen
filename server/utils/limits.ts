@@ -2,6 +2,8 @@ import type Database from 'better-sqlite3'
 import type {
   GlobalLimitEntry,
   GlobalLimitReport,
+  LimitBreakdownItem,
+  LimitBreakdownReport,
   LimitRow,
   LimitScope,
   LimitsReport,
@@ -389,10 +391,7 @@ export function loadSuperByCategory(db: Database.Database) {
   return map
 }
 
-type LimitSpendItem = {
-  categoryId: number | null
-  amount: number
-}
+type LimitSpendItem = LimitBreakdownItem
 
 function addSpent(
   totals: Map<number, number>,
@@ -412,10 +411,21 @@ function oneTimeConsumptionItems(
       `SELECT
          e.id,
          e.category_id AS categoryId,
+         c.name AS categoryName,
+         c.color AS categoryColor,
+         c.icon AS categoryIcon,
+         e.account_id AS accountId,
+         accounts.name AS accountName,
+         e.card_id AS cardId,
+         cards.name AS cardName,
+         e.description,
          e.amount,
+         e.date,
          e.recurrence,
          e.installment_count AS installmentCount
        FROM entries e
+       LEFT JOIN categories c ON c.id = e.category_id
+       LEFT JOIN accounts ON accounts.id = e.account_id
        LEFT JOIN cards ON cards.id = e.card_id
        WHERE e.type = 'expense'
          AND e.recurrence IN ('single', 'installment')
@@ -428,21 +438,46 @@ function oneTimeConsumptionItems(
     .all(month) as {
     id: number
     categoryId: number | null
+    categoryName: string | null
+    categoryColor: string | null
+    categoryIcon: string | null
+    accountId: number | null
+    accountName: string | null
+    cardId: number | null
+    cardName: string | null
+    description: string
     amount: number
+    date: string
     recurrence: 'single' | 'installment'
     installmentCount: number | null
   }[]
 
   return rows
     .filter((row) => !paymentEntryIds.has(row.id))
-    .map((row): LimitSpendItem => ({
-      categoryId: row.categoryId,
-      amount: roundMoney(
+    .map((row): LimitSpendItem => {
+      const amount = roundMoney(
         row.recurrence === 'installment'
           ? row.amount * (row.installmentCount ?? 1)
           : row.amount,
-      ),
-    }))
+      )
+
+      return {
+        id: `entry-${row.id}`,
+        parentId: row.id,
+        source: row.cardId === null ? 'account' : 'card',
+        sourceLabel: row.cardId === null ? row.accountName : row.cardName,
+        date: row.date,
+        description: row.description,
+        amount,
+        originalAmount: row.amount,
+        recurrence: row.recurrence,
+        installmentCount: row.installmentCount,
+        categoryId: row.categoryId,
+        categoryName: row.categoryName,
+        categoryColor: row.categoryColor,
+        categoryIcon: row.categoryIcon,
+      }
+    })
 }
 
 function fixedConsumptionItems(
@@ -456,10 +491,41 @@ function fixedConsumptionItems(
       (item) =>
         item.source !== 'account' || !paymentEntryIds.has(item.parentId),
     )
-    .map((item): LimitSpendItem => ({
-      categoryId: item.categoryId,
-      amount: item.amount,
-    }))
+    .map(
+      (item): LimitSpendItem => ({
+        id: item.id,
+        parentId: item.parentId,
+        source: item.source,
+        sourceLabel: item.source === 'card' ? item.cardName : item.accountName,
+        date: item.date,
+        description: item.description,
+        amount: item.amount,
+        originalAmount: item.amount,
+        recurrence: item.recurrence,
+        installmentCount: item.installmentCount,
+        categoryId: item.categoryId,
+        categoryName: item.categoryName,
+        categoryColor: item.categoryColor,
+        categoryIcon: item.categoryIcon,
+      }),
+    )
+}
+
+function consumptionItems(db: Database.Database, month: string) {
+  return [
+    ...oneTimeConsumptionItems(db, month),
+    ...fixedConsumptionItems(db, month),
+  ]
+}
+
+function itemReferenceKey(
+  item: LimitSpendItem,
+  scope: LimitScope,
+  superByCategory?: Map<number, number>,
+) {
+  const categoryId = item.categoryId ?? 0
+  if (scope === 'category') return categoryId
+  return categoryId === 0 ? 0 : (superByCategory?.get(categoryId) ?? 0)
 }
 
 function spentByReference(
@@ -467,31 +533,17 @@ function spentByReference(
   month: string,
   scope: LimitScope,
 ) {
-  const items = [
-    ...oneTimeConsumptionItems(db, month),
-    ...fixedConsumptionItems(db, month),
-  ]
+  const items = consumptionItems(db, month)
   const totals = new Map<number, number>()
-
-  if (scope === 'category') {
-    for (const item of items) {
-      addSpent(totals, item.categoryId ?? 0, item.amount)
-    }
-    return totals
-  }
-
-  const superByCategory = loadSuperByCategory(db)
+  const superByCategory =
+    scope === 'supercategory' ? loadSuperByCategory(db) : undefined
 
   for (const item of items) {
-    const categoryId = item.categoryId ?? 0
-    const key =
-      categoryId === 0 ? 0 : (superByCategory.get(categoryId) ?? 0)
-    addSpent(totals, key, item.amount)
+    addSpent(totals, itemReferenceKey(item, scope, superByCategory), item.amount)
   }
 
   return totals
 }
-
 export function buildLimitsReport(
   db: Database.Database,
   month: string,
@@ -599,5 +651,58 @@ export function buildLimitsReport(
       limitedRows.reduce((sum, row) => sum + row.spent, 0),
     ),
     rows,
+  }
+}
+export function buildLimitBreakdown(
+  db: Database.Database,
+  month: string,
+  scope: LimitScope,
+  referenceId: number,
+): LimitBreakdownReport {
+  const report = buildLimitsReport(db, month, scope)
+  const row = report.rows.find((item) => item.referenceId === referenceId)
+
+  if (!row) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Limite não encontrado.',
+    })
+  }
+
+  const superByCategory =
+    scope === 'supercategory' ? loadSuperByCategory(db) : undefined
+  const items = consumptionItems(db, month)
+    .filter(
+      (item) => itemReferenceKey(item, scope, superByCategory) === referenceId,
+    )
+    .sort(
+      (a, b) =>
+        b.amount - a.amount ||
+        b.date.localeCompare(a.date) ||
+        a.description.localeCompare(b.description, 'pt-BR'),
+    )
+
+  return {
+    month,
+    scope,
+    referenceId,
+    label: row.label,
+    color: row.color,
+    icon: row.icon,
+    spent: row.spent,
+    limitAmount: row.limitAmount,
+    items,
+    sourceTotals: {
+      account: roundMoney(
+        items
+          .filter((item) => item.source === 'account')
+          .reduce((sum, item) => sum + item.amount, 0),
+      ),
+      card: roundMoney(
+        items
+          .filter((item) => item.source === 'card')
+          .reduce((sum, item) => sum + item.amount, 0),
+      ),
+    },
   }
 }

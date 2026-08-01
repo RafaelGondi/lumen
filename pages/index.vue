@@ -81,13 +81,13 @@ const {
           />
         </div>
 
-        <DashboardSpendingGuard
-          class="spending-guard-section"
+        <DashboardLimitsOverview
+          class="limits-overview-section"
           :month="selectedMonth.key"
         />
 
-        <DashboardLimitsOverview
-          class="limits-overview-section"
+        <DashboardSpendingGuard
+          class="spending-guard-section"
           :month="selectedMonth.key"
         />
       </div>
