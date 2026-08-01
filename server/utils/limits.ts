@@ -389,26 +389,93 @@ export function loadSuperByCategory(db: Database.Database) {
   return map
 }
 
+type LimitSpendItem = {
+  categoryId: number | null
+  amount: number
+}
+
+function addSpent(
+  totals: Map<number, number>,
+  key: number,
+  amount: number,
+) {
+  totals.set(key, roundMoney((totals.get(key) ?? 0) + amount))
+}
+
+function oneTimeConsumptionItems(
+  db: Database.Database,
+  month: string,
+) {
+  const paymentEntryIds = invoicePaymentEntryIds(db)
+  const rows = db
+    .prepare(
+      `SELECT
+         e.id,
+         e.category_id AS categoryId,
+         e.amount,
+         e.recurrence,
+         e.installment_count AS installmentCount
+       FROM entries e
+       LEFT JOIN cards ON cards.id = e.card_id
+       WHERE e.type = 'expense'
+         AND e.recurrence IN ('single', 'installment')
+         AND substr(e.date, 1, 7) = ?
+         AND (
+           e.card_id IS NULL
+           OR cards.active = 1
+         )`,
+    )
+    .all(month) as {
+    id: number
+    categoryId: number | null
+    amount: number
+    recurrence: 'single' | 'installment'
+    installmentCount: number | null
+  }[]
+
+  return rows
+    .filter((row) => !paymentEntryIds.has(row.id))
+    .map((row): LimitSpendItem => ({
+      categoryId: row.categoryId,
+      amount: roundMoney(
+        row.recurrence === 'installment'
+          ? row.amount * (row.installmentCount ?? 1)
+          : row.amount,
+      ),
+    }))
+}
+
+function fixedConsumptionItems(
+  db: Database.Database,
+  month: string,
+) {
+  const paymentEntryIds = invoicePaymentEntryIds(db)
+  return buildSpendingCalendar(db, month, 'fixed')
+    .days.flatMap((day) => day.items)
+    .filter(
+      (item) =>
+        item.source !== 'account' || !paymentEntryIds.has(item.parentId),
+    )
+    .map((item): LimitSpendItem => ({
+      categoryId: item.categoryId,
+      amount: item.amount,
+    }))
+}
+
 function spentByReference(
   db: Database.Database,
   month: string,
   scope: LimitScope,
 ) {
-  const calendar = buildSpendingCalendar(db, month, 'all')
-  const paymentEntryIds = invoicePaymentEntryIds(db)
-  const items = calendar.days
-    .flatMap((day) => day.items)
-    .filter(
-      (item) =>
-        item.source !== 'account' || !paymentEntryIds.has(item.parentId),
-    )
-
+  const items = [
+    ...oneTimeConsumptionItems(db, month),
+    ...fixedConsumptionItems(db, month),
+  ]
   const totals = new Map<number, number>()
 
   if (scope === 'category') {
     for (const item of items) {
-      const key = item.categoryId ?? 0
-      totals.set(key, roundMoney((totals.get(key) ?? 0) + item.amount))
+      addSpent(totals, item.categoryId ?? 0, item.amount)
     }
     return totals
   }
@@ -419,7 +486,7 @@ function spentByReference(
     const categoryId = item.categoryId ?? 0
     const key =
       categoryId === 0 ? 0 : (superByCategory.get(categoryId) ?? 0)
-    totals.set(key, roundMoney((totals.get(key) ?? 0) + item.amount))
+    addSpent(totals, key, item.amount)
   }
 
   return totals
