@@ -250,7 +250,7 @@ function setHovered(id: string | null) {
 .invoice-spend-donut__tooltip p {
   margin-bottom: var(--space-2);
   color: rgb(255 255 255 / 72%);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: var(--weight-medium);
 }
 

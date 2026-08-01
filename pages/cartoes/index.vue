@@ -262,7 +262,7 @@ async function removeCard(card: Card) {
 .cards-summary__note {
   margin-top: var(--space-2);
   color: var(--color-ink-muted);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
 }
 
 .cards-insights {
@@ -286,7 +286,7 @@ async function removeCard(card: Card) {
 .cards-insights__hint {
   margin-top: var(--space-2);
   color: var(--color-ink-muted);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
 }
 
 .cards-empty {

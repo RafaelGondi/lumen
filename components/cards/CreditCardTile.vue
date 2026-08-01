@@ -150,7 +150,7 @@ const available = computed(() =>
 }
 
 .credit-card__meta-label {
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   opacity: 0.8;
 }
 
@@ -200,7 +200,7 @@ const available = computed(() =>
 .credit-card__usage-label,
 .credit-card__available {
   color: var(--color-ink-muted);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
 }
 
 .credit-card__available {

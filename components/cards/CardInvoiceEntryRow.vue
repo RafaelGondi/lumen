@@ -169,12 +169,12 @@ defineEmits<{
 .card-entry__installment {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--space-1);
   padding: 0.15rem 0.45rem;
   border-radius: var(--radius-sm);
   background: var(--color-brand-soft);
   color: var(--color-brand-ink);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;

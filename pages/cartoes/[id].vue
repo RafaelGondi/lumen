@@ -838,7 +838,7 @@ async function onPaymentSaved() {
 .card-insights__hint {
   margin-top: var(--space-2);
   color: var(--color-ink-muted);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
 }
 
 .card-projection__heading h2,
@@ -893,7 +893,7 @@ async function onPaymentSaved() {
   margin-top: var(--space-3);
   padding: 0.3rem 0.55rem;
   border-radius: var(--radius-round);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
 }
 
@@ -965,7 +965,7 @@ async function onPaymentSaved() {
 
 .card-invoice__limit > p {
   color: var(--color-ink-muted);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
 }
 
 .card-invoice__adjustment {

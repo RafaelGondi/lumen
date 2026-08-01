@@ -203,7 +203,7 @@ function barHeight(amount: number) {
   justify-content: space-between;
   padding-bottom: 1.5rem;
   color: var(--color-ink-muted);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -313,7 +313,7 @@ function barHeight(amount: number) {
 
 .projection-chart__col small {
   color: var(--color-ink-muted);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: var(--weight-medium);
 }
 
@@ -348,7 +348,7 @@ function barHeight(amount: number) {
 .projection-chart__tooltip p {
   margin-bottom: var(--space-2);
   color: rgb(255 255 255 / 72%);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: var(--weight-medium);
 }
 

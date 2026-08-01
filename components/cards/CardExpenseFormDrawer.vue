@@ -683,7 +683,7 @@ async function save() {
 
 .card-expense-form__types span {
   color: var(--color-ink-muted);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
 }
 
 .card-expense-form__scope button {
@@ -726,7 +726,7 @@ async function save() {
 .card-expense-form__hint {
   margin: var(--space-1) 0 0;
   color: var(--color-ink-muted);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   line-height: 1.35;
 }
 
