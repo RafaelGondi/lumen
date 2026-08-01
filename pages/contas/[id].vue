@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import {
+  ArrowDownLeft,
   ArrowLeft,
   ArrowLeftRight,
+  ArrowUpRight,
   CheckCircle2,
   CircleOff,
   Pencil,
@@ -10,6 +12,7 @@ import {
   RotateCcw,
   Search,
   Trash2,
+  Wallet,
 } from '@lucide/vue'
 import type { Account } from '~/types/account'
 import type { EntryOccurrence, EntrySeriesScope } from '~/types/entry'
@@ -166,14 +169,14 @@ watch(sortBy, (key) => {
   sortDir.value = defaultSortDir(key)
 })
 
-const heroStyle = computed(() => {
-  const color = account.value?.color ?? '#14508f'
-  return {
-    background: `linear-gradient(135deg, ${color}18 0%, ${color}28 55%, ${color}14 100%)`,
-    borderColor: `${color}33`,
-  }
-})
+const accountSurface = computed(() =>
+  legibleSurface(account.value?.color ?? '#14508f'),
+)
 
+const heroStyle = computed(() => ({
+  '--account-accent': accountSurface.value,
+  '--account-accent-ink': inkOn(accountSurface.value),
+}))
 const isCurrentMonth = computed(() => {
   const now = new Date()
   return (
@@ -361,7 +364,7 @@ function entryMeta(entry: EntryOccurrence) {
     <UiSkeleton height="6rem" radius="md" class="account-detail__spacer" />
   </div>
 
-  <div v-else>
+  <div v-else class="account-detail-page">
     <PageHeading
       eyebrow="Financeiro / Contas"
       :title="account.name"
@@ -379,88 +382,112 @@ function entryMeta(entry: EntryOccurrence) {
       </template>
     </PageHeading>
 
-    <section class="account-hero" :style="heroStyle">
-      <div>
-        <p class="account-hero__name">{{ account.name }}</p>
-        <p class="account-hero__bank">{{ account.bankName }}</p>
-        <p class="account-hero__label">Saldo atual</p>
-        <p class="account-hero__balance">
-          <UiMoney :value="account.balance" />
-        </p>
-      </div>
-      <AccountsBankMark
-        :name="account.bankName"
-        :color="account.color"
-        :bank-key="account.bankKey"
-        size="lg"
-      />
-    </section>
+    <div class="account-overview">
+      <section class="account-hero" :style="heroStyle" aria-label="Resumo da conta">
+        <div class="account-hero__top">
+          <AccountsBankMark
+            :name="account.bankName"
+            :color="account.color"
+            :bank-key="account.bankKey"
+            size="lg"
+          />
+          <div class="account-hero__identity">
+            <p class="account-hero__bank">{{ account.bankName }}</p>
+            <p class="account-hero__name">{{ account.name }}</p>
+          </div>
+        </div>
 
-    <section class="account-month" aria-label="Resumo do mês">
-      <div class="account-month__nav">
-        <UiMonthSwitcher
-          :label="monthLabel"
-          :year="selectedYear"
-          :month="selectedMonth"
-          :can-go-previous="true"
-          :can-go-next="true"
-          :is-current="isCurrentMonth"
-          @previous="shiftMonth(-1)"
-          @next="shiftMonth(1)"
-          @current="goToCurrentMonth"
-          @select="selectMonth"
-        />
-      </div>
+        <div class="account-hero__balance-block">
+          <p class="account-hero__label">Saldo atual</p>
+          <p class="account-hero__balance">
+            <UiMoney :value="account.balance" />
+          </p>
+        </div>
+      </section>
 
-      <div class="account-month__stats">
-        <div>
-          <p>Entradas</p>
-          <strong>
-            <UiMoney :value="monthSummary.income" />
-          </strong>
+      <section class="account-month" aria-label="Resumo do mês">
+        <div class="account-month__header">
+          <div>
+            <p class="account-month__eyebrow">Movimentação mensal</p>
+            <h2>{{ monthLabel }}</h2>
+          </div>
+          <div class="account-month__nav">
+            <UiMonthSwitcher
+              :label="monthLabel"
+              :year="selectedYear"
+              :month="selectedMonth"
+              :can-go-previous="true"
+              :can-go-next="true"
+              :is-current="isCurrentMonth"
+              @previous="shiftMonth(-1)"
+              @next="shiftMonth(1)"
+              @current="goToCurrentMonth"
+              @select="selectMonth"
+            />
+          </div>
         </div>
-        <div>
-          <p>Saídas</p>
-          <strong>
-            <UiMoney :value="monthSummary.expense" />
-          </strong>
+
+        <div class="account-month__stats">
+          <div class="account-month__stat account-month__stat--income">
+            <span class="account-month__icon"><ArrowDownLeft /></span>
+            <div>
+              <p>Entradas</p>
+              <strong><UiMoney :value="monthSummary.income" /></strong>
+            </div>
+          </div>
+          <div class="account-month__stat account-month__stat--expense">
+            <span class="account-month__icon"><ArrowUpRight /></span>
+            <div>
+              <p>Saídas</p>
+              <strong><UiMoney :value="monthSummary.expense" /></strong>
+            </div>
+          </div>
+          <div class="account-month__stat account-month__stat--balance">
+            <span class="account-month__icon"><Wallet /></span>
+            <div>
+              <p>Saldo do mês</p>
+              <strong :class="{ 'account-month__negative': monthSummary.balance < 0 }">
+                {{ monthSummary.balance < 0 ? '− ' : '' }}<UiMoney :value="monthSummary.balance" />
+              </strong>
+            </div>
+          </div>
         </div>
-        <div>
-          <p>Saldo do mês</p>
-          <strong
-            :class="{ 'account-month__negative': monthSummary.balance < 0 }"
-          >
-            <UiMoney :value="monthSummary.balance" />
-          </strong>
-        </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
     <section class="account-entries" aria-label="Lançamentos">
       <UiCard padding="none">
         <header class="account-entries__toolbar">
-          <div class="account-entries__filters">
-            <h2 class="sr-only">Lançamentos</h2>
-            <UiSegmentedControl v-model="filter" :options="filterOptions" />
-            <UiSegmentedControl
-              v-model="sortBy"
-              :options="entrySortOptions"
-              aria-label="Ordenar lançamentos"
-            />
+          <div class="account-entries__heading">
+            <div>
+              <h2>Lançamentos</h2>
+              <p>Movimentações de {{ monthLabel.toLowerCase() }}</p>
+            </div>
             <p class="account-entries__count">
               {{ filteredEntries.length }}
               {{ filteredEntries.length === 1 ? 'item' : 'itens' }}
             </p>
           </div>
 
-          <div class="account-entries__search">
-            <Search aria-hidden="true" />
-            <input
-              v-model="searchQuery"
-              type="search"
-              placeholder="Buscar por descrição ou valor..."
-              aria-label="Buscar lançamentos"
-            />
+          <div class="account-entries__controls">
+            <div class="account-entries__search">
+              <Search aria-hidden="true" />
+              <input
+                v-model="searchQuery"
+                type="search"
+                placeholder="Buscar por descrição ou valor..."
+                aria-label="Buscar lançamentos"
+              />
+            </div>
+
+            <div class="account-entries__filters">
+              <UiSegmentedControl v-model="filter" :options="filterOptions" />
+              <UiSegmentedControl
+                v-model="sortBy"
+                :options="entrySortOptions"
+                aria-label="Ordenar lançamentos"
+              />
+            </div>
           </div>
         </header>
 
@@ -629,113 +656,262 @@ function entryMeta(entry: EntryOccurrence) {
   margin-top: var(--space-8);
 }
 
-.account-hero {
+.account-detail-page {
   display: flex;
-  min-height: 8.5rem;
-  padding: var(--space-6);
-  margin-top: var(--space-6);
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+}
+
+.account-overview {
+  display: grid;
+  grid-template-columns: minmax(17rem, 0.75fr) minmax(32rem, 1.65fr);
+  gap: var(--space-4);
+}
+
+.account-hero {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  min-height: 11rem;
+  padding: var(--space-5);
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-5);
+  border: 1px solid color-mix(in srgb, var(--account-accent), black 8%);
+  border-radius: 0.875rem;
+  background: linear-gradient(
+    135deg,
+    var(--account-accent) 0%,
+    color-mix(in srgb, var(--account-accent), black 16%) 100%
+  );
+  color: var(--account-accent-ink);
+  box-shadow: 0 0.75rem 1.5rem color-mix(in srgb, var(--account-accent), transparent 88%);
+}
+
+.account-hero::after {
+  position: absolute;
+  right: -18%;
+  bottom: -48%;
+  width: 58%;
+  height: 105%;
+  border: 1px solid color-mix(in srgb, var(--account-accent-ink), transparent 82%);
+  border-radius: 999px;
+  content: '';
+  opacity: 0.32;
+  transform: rotate(-14deg);
+}
+
+.account-hero__top,
+.account-hero__balance-block {
+  position: relative;
+  z-index: 1;
+}
+
+.account-hero__top {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.account-hero :deep(.bank-mark) {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--account-accent-ink), transparent 82%);
+}
+
+.account-hero__identity {
+  min-width: 0;
 }
 
 .account-hero__name {
-  color: var(--color-ink);
-  font-size: var(--text-md);
+  overflow: hidden;
+  margin-top: 0.1rem;
+  color: var(--account-accent-ink);
+  font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .account-hero__bank {
-  margin-top: var(--space-1);
-  color: var(--color-ink-muted);
-  font-size: var(--text-xs);
+  color: color-mix(in srgb, var(--account-accent-ink), transparent 22%);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
 }
 
 .account-hero__label {
-  margin-top: var(--space-5);
-  color: var(--color-ink-muted);
-  font-size: var(--text-xs);
+  color: color-mix(in srgb, var(--account-accent-ink), transparent 28%);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
 }
 
 .account-hero__balance {
-  margin-top: var(--space-1);
-  color: var(--color-ink);
-  font-size: clamp(1.5rem, 2vw, var(--text-2xl));
+  margin-top: 0.2rem;
+  color: var(--account-accent-ink);
+  font-size: clamp(1.6rem, 2.4vw, 2rem);
   font-weight: var(--weight-semibold);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
 }
 
 .account-month {
-  margin-top: var(--space-5);
-  padding: var(--space-5) var(--space-6);
+  display: flex;
+  min-width: 0;
+  min-height: 11rem;
+  padding: var(--space-5);
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-5);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: 0.875rem;
   background: var(--color-surface);
   box-shadow: var(--shadow-xs);
+}
+
+.account-month__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.account-month__eyebrow {
+  color: var(--color-ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+}
+
+.account-month__header h2 {
+  margin-top: 0.15rem;
+  color: var(--color-ink);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
 }
 
 .account-month__nav {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
 }
 
 .account-month__stats {
   display: grid;
-  margin-top: var(--space-5);
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-4);
+  border-top: 1px solid var(--color-border);
 }
 
-.account-month__stats p {
-  color: var(--color-ink-muted);
-  font-size: var(--text-xs);
+.account-month__stat {
+  display: flex;
+  min-width: 0;
+  padding: var(--space-4) var(--space-4) 0;
+  align-items: center;
+  gap: var(--space-3);
+  border-left: 1px solid var(--color-border);
 }
 
-.account-month__stats strong {
-  display: block;
-  margin-top: var(--space-1);
-  color: var(--color-ink);
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
+.account-month__stat:first-child {
+  padding-left: 0;
+  border-left: 0;
 }
 
-.account-month__negative {
+.account-month__icon {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  color: var(--color-ink-secondary);
+}
+
+.account-month__icon svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.account-month__stat--income .account-month__icon {
+  background: var(--color-positive-soft);
+  color: var(--color-positive-ink);
+}
+
+.account-month__stat--expense .account-month__icon {
+  background: var(--color-negative-soft);
   color: var(--color-negative-ink);
 }
 
+.account-month__stat p {
+  color: var(--color-ink-muted);
+  font-size: var(--text-2xs);
+}
+
+.account-month__stat strong {
+  display: block;
+  overflow: hidden;
+  margin-top: 0.15rem;
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-month__negative {
+  color: var(--color-negative-ink) !important;
+}
+
 .account-entries {
-  margin-top: var(--space-5);
+  min-width: 0;
 }
 
 .account-entries__toolbar {
   display: flex;
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-5);
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
 
+.account-entries__heading,
+.account-entries__controls,
 .account-entries__filters {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
 }
 
+.account-entries__heading h2 {
+  color: var(--color-ink);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.account-entries__heading div > p {
+  margin-top: 0.15rem;
+  color: var(--color-ink-muted);
+  font-size: var(--text-2xs);
+}
+
 .account-entries__count {
   color: var(--color-ink-muted);
   font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.account-entries__controls {
+  align-items: stretch;
+}
+
+.account-entries__filters {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
 }
 
 .account-entries__search {
   display: flex;
+  min-width: 14rem;
   min-height: 2.5rem;
   padding: 0 var(--space-3);
+  flex: 1;
   align-items: center;
   gap: var(--space-2);
   border: 1px solid var(--color-border-strong);
@@ -755,6 +931,7 @@ function entryMeta(entry: EntryOccurrence) {
 }
 
 .account-entries__search input {
+  min-width: 0;
   flex: 1;
   border: 0;
   background: transparent;
@@ -771,7 +948,6 @@ function entryMeta(entry: EntryOccurrence) {
   padding: var(--space-4) var(--space-5);
   gap: var(--space-3);
 }
-
 .entry-row {
   display: grid;
   min-height: 4.5rem;
@@ -916,21 +1092,65 @@ function entryMeta(entry: EntryOccurrence) {
   opacity: 0.72;
 }
 
+@media (max-width: 900px) {
+  .account-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
-  .account-hero {
-    flex-direction: column;
-    align-items: flex-start;
-    min-height: 0;
+  .account-detail-page {
     gap: var(--space-4);
   }
 
-  .account-month__nav {
+  .account-hero,
+  .account-month {
+    min-height: 10.5rem;
+  }
+
+  .account-month__header,
+  .account-entries__controls {
     flex-direction: column;
     align-items: stretch;
   }
 
+  .account-month__nav {
+    overflow-x: auto;
+  }
+
   .account-month__stats {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .account-month__stat {
+    padding-right: var(--space-2);
+    padding-left: var(--space-2);
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .account-month__stat:first-child {
+    padding-left: 0;
+  }
+
+  .account-entries__toolbar {
+    padding: var(--space-4);
+  }
+
+  .account-entries__controls {
+    min-width: 0;
+  }
+
+  .account-entries__filters {
+    overflow-x: auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    padding-bottom: 0.1rem;
+  }
+
+  .account-entries__search {
+    min-width: 0;
   }
 
   .entry-row {
@@ -966,4 +1186,23 @@ function entryMeta(entry: EntryOccurrence) {
     grid-area: actions;
   }
 }
-</style>
+
+@media (max-width: 480px) {
+  .account-hero,
+  .account-month {
+    padding: var(--space-4);
+  }
+
+  .account-month__stat {
+    gap: var(--space-2);
+  }
+
+  .account-month__icon {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  .account-month__stat strong {
+    font-size: var(--text-xs);
+  }
+}</style>
