@@ -138,4 +138,10 @@ defineEmits<{
   width: 0.85rem;
   height: 0.85rem;
 }
+
+@media (max-width: 640px) {
+  .category-card__actions {
+    opacity: 1;
+  }
+}
 </style>

@@ -362,7 +362,7 @@ async function removeSupercategory(supercategory: Supercategory) {
 
 .categories-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
   gap: var(--space-3);
 }
 
@@ -372,5 +372,54 @@ async function removeSupercategory(supercategory: Supercategory) {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: start;
   gap: var(--space-4);
+}
+
+.categories-grid > *,
+.supercategories-grid > * {
+  min-width: 0;
+}
+
+@media (max-width: 960px) {
+  .supercategories-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .categories-tabs {
+    margin-top: var(--space-4);
+  }
+
+  .categories-toolbar {
+    display: grid;
+    margin: var(--space-4) 0;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .categories-toolbar__search {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .categories-toolbar :deep(.ui-segmented) {
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .categories-toolbar :deep(.ui-segmented__option) {
+    flex: 1 0 auto;
+  }
+
+  .categories-orphans {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .categories-grid,
+  .supercategories-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>

@@ -162,6 +162,8 @@ const VISIBLE_MEMBERS = 5
 
 .super-card__members li {
   display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
   min-height: 1.5rem;
   padding: 0 var(--space-2);
   align-items: center;
@@ -172,6 +174,7 @@ const VISIBLE_MEMBERS = 5
   color: var(--color-ink-secondary);
   font-size: 0.6875rem;
   font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
 }
 
 .super-card__member-dot {
@@ -190,5 +193,15 @@ const VISIBLE_MEMBERS = 5
   border-top: 1px solid var(--color-border);
   color: var(--color-ink-muted);
   font-size: var(--text-xs);
+}
+
+@media (max-width: 640px) {
+  .super-card {
+    padding: var(--space-4);
+  }
+
+  .super-card__actions {
+    opacity: 1;
+  }
 }
 </style>
