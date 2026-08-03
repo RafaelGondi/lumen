@@ -47,6 +47,7 @@ const isCurrentMonth = computed(() => {
 const scopeOptions = [
   { value: 'category' as const, label: 'Categoria' },
   { value: 'supercategory' as const, label: 'Supercategoria' },
+  { value: 'recurrence' as const, label: 'Tipo' },
 ]
 
 const {
@@ -67,6 +68,23 @@ const selectedRow = ref<CategorySpendRow | null>(null)
 
 const topRow = computed(() => report.value?.rows[0] ?? null)
 
+const scopePluralLabel = computed(() => {
+  if (scope.value === 'supercategory') return 'supercategorias'
+  if (scope.value === 'recurrence') return 'tipos de gasto'
+  return 'categorias'
+})
+
+const scopeTopLabel = computed(() => {
+  if (scope.value === 'supercategory') return 'Maior supercategoria'
+  if (scope.value === 'recurrence') return 'Maior tipo'
+  return 'Maior categoria'
+})
+
+const donutOthersLabel = computed(() => {
+  if (scope.value === 'supercategory') return 'supercategorias'
+  if (scope.value === 'recurrence') return 'tipos'
+  return 'categorias'
+})
 const accountShare = computed(() => {
   if (!report.value?.monthTotal) return 0
   return Math.round(
@@ -96,15 +114,12 @@ const kpiCards = computed(() => {
       key: 'total',
       label: 'Total do mês',
       value: report.value.monthTotal,
-      support: `${report.value.rows.length} ${scope.value === 'category' ? 'categorias' : 'supercategorias'} com gasto`,
+      support: `${report.value.rows.length} ${scopePluralLabel.value} com gasto`,
       tone: 'neutral' as const,
     },
     {
       key: 'top',
-      label:
-        scope.value === 'category'
-          ? 'Maior categoria'
-          : 'Maior supercategoria',
+      label: scopeTopLabel.value,
       value: topRow.value?.amount ?? 0,
       support: topRow.value
         ? `${topRow.value.percent}% · ${topRow.value.itemCount} lanç.`
@@ -243,9 +258,7 @@ function rowPercent(row: CategorySpendRow) {
         <div v-else class="category-report__donut">
           <CardsInvoiceSpendDonut
             :items="donutItems"
-            :others-label="
-              scope === 'category' ? 'categorias' : 'supercategorias'
-            "
+            :others-label="donutOthersLabel"
           />
         </div>
       </UiCard>
@@ -267,7 +280,7 @@ function rowPercent(row: CategorySpendRow) {
         </header>
 
         <ul v-if="report?.rows.length" class="category-report__rows">
-          <li v-for="row in report.rows" :key="row.referenceId">
+          <li v-for="row in report.rows" :key="`${report.scope}-${row.referenceId}`">
             <button type="button" @click="openRow(row)">
               <CategoriesCategoryIconChip
                 :icon="row.icon"

@@ -9,6 +9,8 @@
 
 export type CardInvoiceStatus = 'open' | 'closed' | 'paid' | 'overdue'
 
+export type CardInvoiceSpendGroup = 'category' | 'supercategory' | 'recurrence'
+
 export interface CardInvoiceCategorySpend {
   id: string
   name: string
@@ -100,6 +102,7 @@ export interface CardInvoiceDetail {
   projection: CardInvoiceProjectionMonth[]
   categories: CardInvoiceCategorySpend[]
   supercategories: CardInvoiceCategorySpend[]
+  recurrences: CardInvoiceCategorySpend[]
   entries: CardInvoiceEntry[]
 }
 

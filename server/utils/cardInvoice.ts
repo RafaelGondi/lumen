@@ -148,6 +148,24 @@ function buildSupercategories(entries: CardInvoiceEntry[]) {
   }))
 }
 
+function buildRecurrences(entries: CardInvoiceEntry[]) {
+  const labels = {
+    single: 'Compra avulsa',
+    installment: 'Compra parcelada',
+    fixed: 'Despesa fixa',
+  }
+  const colors = {
+    single: '#4981a1',
+    installment: '#896db9',
+    fixed: '#bf8230',
+  }
+
+  return buildSpendGroups(entries, (entry) => ({
+    id: entry.recurrence,
+    name: labels[entry.recurrence],
+    color: colors[entry.recurrence],
+  }))
+}
 function dueDateInMonth(month: string, dueDay: number) {
   const { year, month: value } = monthParts(month)
   const lastDay = new Date(year, value, 0).getDate()
@@ -423,6 +441,7 @@ export function buildCardInvoice(
     projection,
     categories: buildCategories(entries),
     supercategories: buildSupercategories(entries),
+    recurrences: buildRecurrences(entries),
     entries,
   }
 }
@@ -443,13 +462,15 @@ export function cardUsageSummary(
     estimatedPayoffLabel: null,
   }
   const invoice = buildCardInvoice(db, withPlaceholder, fromMonth)
-  const usedAmount = roundMoney(
-    invoice.projection
-      .filter((item) => item.month >= fromMonth)
-      .reduce((sum, item) => sum + item.amount, 0),
+  const paidInvoices = loadCardInvoicePaymentsMap(db, card.id)
+  const openProjection = invoice.projection.filter(
+    (item) => item.month >= fromMonth && !paidInvoices.has(item.month),
   )
-  const lastProjected = [...invoice.projection]
-    .filter((item) => item.month >= fromMonth && item.amount > 0)
+  const usedAmount = roundMoney(
+    openProjection.reduce((sum, item) => sum + item.amount, 0),
+  )
+  const lastProjected = [...openProjection]
+    .filter((item) => item.amount > 0)
     .at(-1)
 
   return {

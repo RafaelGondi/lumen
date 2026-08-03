@@ -11,7 +11,10 @@ import {
 } from '@lucide/vue'
 import type { Card } from '~/types/card'
 import type { CardExpenseSaveResult } from '~/types/cardExpense'
-import type { CardInvoiceDetail } from '~/types/cardInvoice'
+import type {
+  CardInvoiceDetail,
+  CardInvoiceSpendGroup,
+} from '~/types/cardInvoice'
 import type { EntrySeriesScope } from '~/types/entry'
 import type { SpendingGuardReport } from '~/types/spendingGuard'
 import { transacaoFaturaMonth } from '~/utils/cardInvoiceCycle'
@@ -46,6 +49,10 @@ const selectedYear = ref(now.getFullYear())
 const selectedMonth = ref(now.getMonth() + 1)
 const invoiceMonthInitialized = ref(false)
 const searchQuery = ref('')
+type EntryTypeFilter =
+  | 'all'
+  | CardInvoiceDetail['entries'][number]['recurrence']
+const entryTypeFilter = ref<EntryTypeFilter>('all')
 const sortBy = ref<EntrySortKey>('date')
 const sortDir = ref<'asc' | 'desc'>(defaultSortDir('date'))
 const expandedCategoryKeys = ref<string[]>([])
@@ -65,11 +72,19 @@ const spendingImpact = ref<{
   report: SpendingGuardReport
   purchase: CardExpenseSaveResult
 } | null>(null)
-const spendGroupBy = ref<'category' | 'supercategory'>('category')
+const spendGroupBy = ref<CardInvoiceSpendGroup>('category')
 
 const spendGroupOptions = [
   { value: 'category' as const, label: 'Categoria' },
   { value: 'supercategory' as const, label: 'Supercategoria' },
+  { value: 'recurrence' as const, label: 'Tipo' },
+]
+
+const entryTypeOptions = [
+  { value: 'all' as const, label: 'Tudo' },
+  { value: 'single' as const, label: 'Avulsa' },
+  { value: 'installment' as const, label: 'Parcelada' },
+  { value: 'fixed' as const, label: 'Fixa' },
 ]
 
 function todayIsoLocal() {
@@ -177,18 +192,28 @@ const lastInstallments = computed(() =>
   ),
 )
 
-const activeSpendGroups = computed(() =>
-  spendGroupBy.value === 'supercategory'
-    ? (invoice.value?.supercategories ?? [])
-    : (invoice.value?.categories ?? []),
-)
+const activeSpendGroups = computed(() => {
+  if (spendGroupBy.value === 'supercategory') {
+    return invoice.value?.supercategories ?? []
+  }
+  if (spendGroupBy.value === 'recurrence') {
+    return invoice.value?.recurrences ?? []
+  }
+  return invoice.value?.categories ?? []
+})
 
-const activeSpendOthersLabel = computed(() =>
-  spendGroupBy.value === 'supercategory' ? 'supercategorias' : 'categorias',
-)
+const activeSpendOthersLabel = computed(() => {
+  if (spendGroupBy.value === 'supercategory') return 'supercategorias'
+  if (spendGroupBy.value === 'recurrence') return 'tipos'
+  return 'categorias'
+})
 
 const filteredBase = computed(() => {
-  const entries = invoice.value?.entries ?? []
+  const entries = (invoice.value?.entries ?? []).filter(
+    (entry) =>
+      entryTypeFilter.value === 'all' ||
+      entry.recurrence === entryTypeFilter.value,
+  )
   const term = searchQuery.value.trim().toLowerCase()
   if (!term) return entries
 
@@ -614,11 +639,18 @@ async function onPaymentSaved() {
               {{ filteredEntries.length === 1 ? 'item' : 'itens' }}
             </p>
           </div>
-          <UiSegmentedControl
-            v-model="sortBy"
-            :options="entrySortOptions"
-            aria-label="Ordenar lançamentos"
-          />
+          <div class="card-entries__controls">
+            <UiSegmentedControl
+              v-model="entryTypeFilter"
+              :options="entryTypeOptions"
+              aria-label="Filtrar lançamentos por tipo"
+            />
+            <UiSegmentedControl
+              v-model="sortBy"
+              :options="entrySortOptions"
+              aria-label="Ordenar lançamentos"
+            />
+          </div>
         </div>
 
         <div class="card-entries__search">
@@ -1023,6 +1055,14 @@ async function onPaymentSaved() {
   gap: var(--space-2);
 }
 
+.card-categories {
+  overflow: visible;
+}
+
+.card-categories :deep(.ak-card__body) {
+  overflow: visible;
+}
+
 .card-categories__heading {
   display: flex;
   flex-wrap: wrap;
@@ -1044,6 +1084,14 @@ async function onPaymentSaved() {
   justify-content: space-between;
   gap: var(--space-3);
 }
+
+.card-entries__controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
 
 .card-entries__search {
   display: flex;

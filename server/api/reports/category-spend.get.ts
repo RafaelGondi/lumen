@@ -23,8 +23,13 @@ export default defineEventHandler((event): CategorySpendReport => {
     })
   }
 
-  const scope: CategorySpendScope =
-    query.scope === 'supercategory' ? 'supercategory' : 'category'
+  const requestedScope = typeof query.scope === 'string' ? query.scope : 'category'
+  const validScopes: CategorySpendScope[] = ['category', 'supercategory', 'recurrence']
+  const scope: CategorySpendScope = validScopes.includes(
+    requestedScope as CategorySpendScope,
+  )
+    ? (requestedScope as CategorySpendScope)
+    : 'category'
 
   return buildCategorySpendReport(useDb(), month, scope)
 })

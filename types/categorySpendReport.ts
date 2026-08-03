@@ -3,10 +3,11 @@ import type {
   SpendingGuardSourceTotals,
 } from '~/types/spendingGuard'
 
-export type CategorySpendScope = 'category' | 'supercategory'
+export type CategorySpendScope = 'category' | 'supercategory' | 'recurrence'
+export type CategorySpendReferenceId = number | string
 
 export interface CategorySpendRow {
-  referenceId: number
+  referenceId: CategorySpendReferenceId
   label: string
   color: string
   icon: string
@@ -23,6 +24,6 @@ export interface CategorySpendReport {
   scope: CategorySpendScope
   monthTotal: number
   sourceTotals: SpendingGuardSourceTotals
-  topReferenceId: number | null
+  topReferenceId: CategorySpendReferenceId | null
   rows: CategorySpendRow[]
 }

@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3'
 import type {
+  CategorySpendReferenceId,
   CategorySpendReport,
   CategorySpendRow,
   CategorySpendScope,
@@ -34,6 +35,24 @@ type ReferenceMeta = {
   label: string
   color: string
   icon: string
+}
+
+const RECURRENCE_META: Record<string, ReferenceMeta> = {
+  single: {
+    label: 'Compra avulsa',
+    color: '#4981a1',
+    icon: 'receipt',
+  },
+  installment: {
+    label: 'Compra parcelada',
+    color: '#896db9',
+    icon: 'layers',
+  },
+  fixed: {
+    label: 'Despesa fixa',
+    color: '#bf8230',
+    icon: 'repeat-2',
+  },
 }
 
 function roundPercent(value: number) {
@@ -169,7 +188,10 @@ function referenceIdForItem(
   item: SpendingCalendarItem,
   scope: CategorySpendScope,
   superByCategory: Map<number, number>,
-) {
+): CategorySpendReferenceId {
+  if (scope === 'recurrence') {
+    return item.recurrence
+  }
   if (scope === 'category') {
     return item.categoryId ?? 0
   }
@@ -178,8 +200,23 @@ function referenceIdForItem(
   return categoryId === 0 ? 0 : (superByCategory.get(categoryId) ?? 0)
 }
 
+function fallbackMeta(referenceId: CategorySpendReferenceId, scope: CategorySpendScope) {
+  if (scope === 'recurrence') {
+    return RECURRENCE_META[String(referenceId)] ?? {
+      label: 'Tipo de gasto',
+      color: '#94a3b8',
+      icon: 'receipt',
+    }
+  }
+  return {
+    label: referenceId === 0 ? 'Outros' : 'Item ' + referenceId,
+    color: '#94a3b8',
+    icon: 'tag',
+  }
+}
+
 function buildBreakdownGroup(
-  referenceId: number,
+  referenceId: CategorySpendReferenceId,
   meta: ReferenceMeta,
   items: SpendingCalendarItem[],
   month: string,
@@ -213,12 +250,18 @@ export function buildCategorySpendReport(
   const closingDays = loadCardClosingDays(db)
   const superByCategory = loadSuperByCategory(db)
   const metaMap =
-    scope === 'category' ? loadCategoryMeta(db) : loadSuperMeta(db)
+    scope === 'category'
+      ? loadCategoryMeta(db)
+      : scope === 'supercategory'
+        ? loadSuperMeta(db)
+        : new Map<CategorySpendReferenceId, ReferenceMeta>(
+            Object.entries(RECURRENCE_META),
+          )
   const monthTotal = roundMoney(
     items.reduce((sum, item) => sum + item.amount, 0),
   )
   const sourceTotals = totalsBySource(items)
-  const grouped = new Map<number, SpendingCalendarItem[]>()
+  const grouped = new Map<CategorySpendReferenceId, SpendingCalendarItem[]>()
 
   for (const item of items) {
     const referenceId = referenceIdForItem(item, scope, superByCategory)
@@ -230,11 +273,7 @@ export function buildCategorySpendReport(
   const rows: CategorySpendRow[] = []
 
   for (const [referenceId, groupItems] of grouped) {
-    const meta = metaMap.get(referenceId) ?? {
-      label: referenceId === 0 ? 'Outros' : `Item ${referenceId}`,
-      color: '#94a3b8',
-      icon: 'tag',
-    }
+    const meta = metaMap.get(referenceId) ?? fallbackMeta(referenceId, scope)
     const amount = roundMoney(
       groupItems.reduce((sum, item) => sum + item.amount, 0),
     )

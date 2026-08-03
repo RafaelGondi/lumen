@@ -10,7 +10,7 @@ const total = computed(() =>
   props.items.reduce((sum, e) => sum + e.amount, 0),
 )
 
-const expanded = ref(true)
+const expanded = ref(false)
 
 function formatMoney(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
