@@ -607,6 +607,7 @@ function entryMeta(entry: EntryOccurrence) {
 
         <UiEmptyState
           v-else
+          class="account-entries__empty"
           :title="
             monthEntries.length
               ? 'Nenhum lançamento encontrado'
@@ -678,14 +679,13 @@ function entryMeta(entry: EntryOccurrence) {
   justify-content: space-between;
   gap: var(--space-5);
   border: 1px solid color-mix(in srgb, var(--account-accent), black 8%);
-  border-radius: 0.875rem;
+  border-radius: var(--card-radius);
   background: linear-gradient(
     135deg,
     var(--account-accent) 0%,
     color-mix(in srgb, var(--account-accent), black 16%) 100%
   );
   color: var(--account-accent-ink);
-  box-shadow: 0 0.75rem 1.5rem color-mix(in srgb, var(--account-accent), transparent 88%);
 }
 
 .account-hero::after {
@@ -760,8 +760,8 @@ function entryMeta(entry: EntryOccurrence) {
   flex-direction: column;
   justify-content: space-between;
   gap: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: 0.875rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
   background: var(--color-surface);
   box-shadow: var(--shadow-xs);
 }
@@ -947,6 +947,18 @@ function entryMeta(entry: EntryOccurrence) {
   display: grid;
   padding: var(--space-4) var(--space-5);
   gap: var(--space-3);
+}
+
+.account-entries__empty {
+  min-height: 20rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.account-entries__empty :deep(.ak-empty) {
+  min-height: inherit;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 .entry-row {
   display: grid;

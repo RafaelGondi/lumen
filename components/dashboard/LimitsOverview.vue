@@ -102,6 +102,11 @@ const overCount = computed(
     ).length,
 )
 
+const totalPercentLabel = computed(() => {
+  if (!totalLimited.value) return '0%'
+  return `${Math.round((totalSpentLimited.value / totalLimited.value) * 100)}%`
+})
+
 function rowPercent(row: LimitRow) {
   if (!row.limitAmount) return 0
   return Math.min(100, (row.spent / row.limitAmount) * 100)
@@ -109,6 +114,11 @@ function rowPercent(row: LimitRow) {
 
 function isOver(row: LimitRow) {
   return row.limitAmount !== null && row.spent > row.limitAmount
+}
+
+function rowPercentLabel(row: LimitRow) {
+  if (!row.limitAmount) return '0%'
+  return `${Math.round((row.spent / row.limitAmount) * 100)}%`
 }
 
 const breakdownOpen = ref(false)
@@ -196,6 +206,7 @@ watch(
         <div class="limits-overview__total-copy">
           <span>Total limitado</span>
           <strong :class="{ 'is-danger': totalOver }">
+            <span class="limits-overview__percent">{{ totalPercentLabel }}</span>
             <UiMoney :value="totalSpentLimited" />
             <span>de <UiMoney :value="totalLimited" /></span>
           </strong>
@@ -222,12 +233,20 @@ watch(
               size="sm"
             />
             <div class="limits-overview__row-copy">
-              <strong>
-                {{ row.label }}
-                <span class="limits-overview__scope">
-                  {{ row.scope === 'supercategory' ? 'Super' : 'Cat.' }}
+              <div class="limits-overview__row-topline">
+                <strong>
+                  {{ row.label }}
+                  <span class="limits-overview__scope">
+                    {{ row.scope === 'supercategory' ? 'Supercategoria' : 'Categoria' }}
+                  </span>
+                </strong>
+                <span
+                  class="limits-overview__row-percent"
+                  :class="{ 'is-danger': isOver(row) }"
+                >
+                  {{ rowPercentLabel(row) }}
                 </span>
-              </strong>
+              </div>
               <div
                 class="limits-overview__row-track"
                 :class="{ 'is-danger': isOver(row) }"
@@ -239,12 +258,12 @@ watch(
                   }"
                 />
               </div>
-            </div>
-            <div class="limits-overview__row-amounts">
-              <strong :class="{ 'is-danger': isOver(row) }">
-                <UiMoney :value="row.spent" />
-              </strong>
-              <span>de <UiMoney :value="row.limitAmount!" /></span>
+              <div class="limits-overview__row-amounts">
+                <strong :class="{ 'is-danger': isOver(row) }">
+                  <UiMoney :value="row.spent" />
+                </strong>
+                <span>de <UiMoney :value="row.limitAmount!" /></span>
+              </div>
             </div>
           </button>
         </li>
@@ -366,12 +385,16 @@ watch(
 }
 
 .limits-overview__total-copy strong {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--space-1);
   color: var(--color-ink);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
 }
 
-.limits-overview__total-copy strong span {
+.limits-overview__total-copy strong span:not(.limits-overview__percent) {
   color: var(--color-ink-muted);
   font-weight: var(--weight-medium);
 }
@@ -412,7 +435,7 @@ watch(
   width: 100%;
   align-items: start;
   gap: var(--space-3);
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   padding: 0;
   border: 0;
   background: transparent;
@@ -421,12 +444,25 @@ watch(
   cursor: pointer;
 }
 
-.limits-overview__row-button:hover .limits-overview__row-copy strong {
+.limits-overview__row-button:hover .limits-overview__row-topline strong {
   color: var(--color-brand);
 }
 
-.limits-overview__row-copy strong {
+.limits-overview__row-copy {
+  min-width: 0;
+}
+
+.limits-overview__row-topline {
   display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.limits-overview__row-topline strong {
+  display: flex;
+  min-width: 0;
   align-items: center;
   gap: var(--space-2);
   overflow: hidden;
@@ -435,15 +471,27 @@ watch(
   white-space: nowrap;
 }
 
+.limits-overview__row-percent {
+  flex: 0 0 auto;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.limits-overview__row-percent.is-danger {
+  color: var(--color-negative-ink);
+}
+
 .limits-overview__scope {
   flex-shrink: 0;
-  padding: 0.1rem 0.35rem;
+  padding: 0.1rem 0.4rem;
   border-radius: var(--radius-round);
   background: var(--color-surface-subtle);
   color: var(--color-ink-muted);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: var(--weight-medium);
-  text-transform: uppercase;
+  line-height: 1.25;
 }
 
 .limits-overview__row-track {
@@ -466,22 +514,32 @@ watch(
 }
 
 .limits-overview__row-amounts {
-  text-align: right;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
 }
 
 .limits-overview__row-amounts strong {
-  display: block;
-  font-size: var(--text-sm);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.limits-overview__percent {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
+}
+
+.limits-overview__total-copy strong.is-danger .limits-overview__percent {
+  color: inherit;
 }
 
 .limits-overview__row-amounts strong.is-danger {
   color: var(--color-negative-ink);
-}
-
-.limits-overview__row-amounts span {
-  color: var(--color-ink-muted);
-  font-size: var(--text-xs);
 }
 
 .limits-overview__footer {

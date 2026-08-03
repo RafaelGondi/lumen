@@ -109,6 +109,8 @@
    * ("white cards with hairline borders") — sem voltar a usar sombra.
    */
   --card-bg: var(--bg-elevated);
+  --card-border: var(--border);
+  --card-radius: 0.75rem;
   --page-pad-x: 0;
   --page-pad-top: 0;
 }
