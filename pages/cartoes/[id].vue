@@ -23,6 +23,7 @@ import {
   defaultSortDir,
   entrySortOptions,
   groupEntriesByCategory,
+  groupEntriesBySupercategory,
   sortEntries,
   type EntrySortKey,
 } from '~/utils/sortEntries'
@@ -53,8 +54,9 @@ type EntryTypeFilter =
   | 'all'
   | CardInvoiceDetail['entries'][number]['recurrence']
 const entryTypeFilter = ref<EntryTypeFilter>('all')
-const sortBy = ref<EntrySortKey>('date')
-const sortDir = ref<'asc' | 'desc'>(defaultSortDir('date'))
+type CardEntrySortKey = EntrySortKey | 'supercategory'
+const sortBy = ref<CardEntrySortKey>('date')
+const sortDir = ref<'asc' | 'desc'>(defaultCardSortDir('date'))
 const expandedCategoryKeys = ref<string[]>([])
 const invoiceSectionRef = ref<HTMLElement | null>(null)
 const expenseDrawerOpen = ref(false)
@@ -86,6 +88,21 @@ const entryTypeOptions = [
   { value: 'installment' as const, label: 'Parcelada' },
   { value: 'fixed' as const, label: 'Fixa' },
 ]
+
+const cardEntrySortOptions: { value: CardEntrySortKey; label: string }[] = [
+  ...entrySortOptions,
+  { value: 'supercategory', label: 'Supercategoria' },
+]
+
+function defaultCardSortDir(key: CardEntrySortKey) {
+  return key === 'supercategory' ? 'asc' : defaultSortDir(key)
+}
+
+function isGroupedSortKey(
+  key: CardEntrySortKey,
+): key is 'category' | 'supercategory' {
+  return key === 'category' || key === 'supercategory'
+}
 
 function todayIsoLocal() {
   const today = new Date()
@@ -232,23 +249,30 @@ const filteredBase = computed(() => {
   })
 })
 
-const filteredEntries = computed(() =>
-  sortEntries(
-    filteredBase.value,
-    sortBy.value === 'category' ? 'date' : sortBy.value,
-    sortBy.value === 'category' ? 'desc' : sortDir.value,
-  ),
-)
-
 const categoryGroups = computed(() =>
-  groupEntriesByCategory(filteredBase.value),
+  sortBy.value === 'supercategory'
+    ? groupEntriesBySupercategory(filteredBase.value)
+    : groupEntriesByCategory(filteredBase.value),
 )
 
-const showCategoryGroups = computed(() => sortBy.value === 'category')
+const showCategoryGroups = computed(
+  () => isGroupedSortKey(sortBy.value),
+)
+
+const filteredEntries = computed(() => {
+  const sortKey: EntrySortKey = isGroupedSortKey(sortBy.value)
+    ? 'date'
+    : sortBy.value
+  return sortEntries(
+    filteredBase.value,
+    sortKey,
+    isGroupedSortKey(sortBy.value) ? 'desc' : sortDir.value,
+  )
+})
 
 watch(sortBy, (key) => {
-  sortDir.value = defaultSortDir(key)
-  if (key === 'category') {
+  sortDir.value = defaultCardSortDir(key)
+  if (isGroupedSortKey(key)) {
     const first = categoryGroups.value[0]
     expandedCategoryKeys.value = first ? [first.key] : []
   }
@@ -647,7 +671,7 @@ async function onPaymentSaved() {
             />
             <UiSegmentedControl
               v-model="sortBy"
-              :options="entrySortOptions"
+              :options="cardEntrySortOptions"
               aria-label="Ordenar lançamentos"
             />
           </div>

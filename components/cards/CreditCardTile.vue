@@ -29,7 +29,9 @@ const level = computed(() => {
   return 'ok'
 })
 
-const headline = computed(() =>
+const headline = computed(() => roundMoney(props.card.usedAmount))
+
+const secondaryAmount = computed(() =>
   overLimit.value
     ? roundMoney(props.card.usedAmount - props.card.creditLimit)
     : roundMoney(props.card.creditLimit - props.card.usedAmount),
@@ -104,7 +106,7 @@ const cardStyle = computed(() => ({
       <div class="credit-card__metric">
         <div>
           <p class="credit-card__metric-label">
-            {{ overLimit ? 'Excesso do limite' : 'Limite disponível' }}
+            Limite utilizado
           </p>
           <p class="credit-card__metric-value">
             <UiMoney :value="headline" />
@@ -129,8 +131,8 @@ const cardStyle = computed(() => ({
 
       <div class="credit-card__usage">
         <p>
-          <span>Utilizado</span>
-          <strong><UiMoney :value="card.usedAmount" /></strong>
+          <span>{{ overLimit ? 'Excesso' : 'Disponível' }}</span>
+          <strong><UiMoney :value="secondaryAmount" /></strong>
         </p>
         <span class="credit-card__usage-separator" aria-hidden="true" />
         <p>

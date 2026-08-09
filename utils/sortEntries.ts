@@ -17,6 +17,10 @@ export type EntrySortable = {
   categoryId?: number | null
   categoryIcon?: string | null
   categoryColor?: string | null
+  supercategoryName?: string | null
+  supercategoryId?: number | null
+  supercategoryIcon?: string | null
+  supercategoryColor?: string | null
 }
 
 /** Data que ordena: a da compra quando existe, senão a da cobrança. */
@@ -100,6 +104,48 @@ export function groupEntriesByCategory<T extends EntrySortable>(
       categoryId: entry.categoryId ?? null,
       categoryIcon: entry.categoryIcon ?? null,
       categoryColor: entry.categoryColor ?? null,
+      total: entry.amount,
+      entries: [entry],
+    })
+  }
+
+  return [...map.values()]
+    .map((group) => ({
+      ...group,
+      total: Math.round(group.total * 100) / 100,
+      entries: sortEntries(group.entries, 'date', 'desc'),
+    }))
+    .sort((a, b) => {
+      const byTotal = b.total - a.total
+      if (byTotal !== 0) return byTotal
+      return compareText(a.name, b.name)
+    })
+}
+
+/** Agrupa por supercategoria; grupos pelo maior total; itens por data (mais recente). */
+export function groupEntriesBySupercategory<T extends EntrySortable>(
+  entries: T[],
+): EntryCategoryGroup<T>[] {
+  const map = new Map<string, EntryCategoryGroup<T>>()
+
+  for (const entry of entries) {
+    const name = entry.supercategoryName?.trim() || 'Sem supercategoria'
+    const key =
+      entry.supercategoryId != null
+        ? `id:${entry.supercategoryId}`
+        : `name:${name}`
+    const existing = map.get(key)
+    if (existing) {
+      existing.entries.push(entry)
+      existing.total += entry.amount
+      continue
+    }
+    map.set(key, {
+      key,
+      name,
+      categoryId: entry.supercategoryId ?? null,
+      categoryIcon: entry.supercategoryIcon ?? null,
+      categoryColor: entry.supercategoryColor ?? null,
       total: entry.amount,
       entries: [entry],
     })
