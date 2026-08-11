@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 142 32" role="img" aria-labelledby="title desc">
+  <title id="title">Lumen</title>
+  <desc id="desc">Monograma L com um arco de luz, acompanhado do nome Lumen.</desc>
+  <rect width="32" height="32" rx="7" fill="#5184b1"/>
+  <path
+    d="M10 8.5v13h12M14 10a8 8 0 0 1 8 8"
+    fill="none"
+    stroke="#fff"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="2.5"
+  />
+  <text
+    x="46"
+    y="21.5"
+    fill="#213129"
+    font-family="DM Sans, Arial, sans-serif"
+    font-size="15"
+    font-weight="700"
+    letter-spacing="2.4"
+  >LUMEN</text>
+</svg>

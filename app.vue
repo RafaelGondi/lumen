@@ -58,7 +58,13 @@ onBeforeUnmount(() => {
         </button>
 
         <NuxtLink class="brand" to="/" aria-label="Lumen, início" @click="closeMenu">
-          <span class="brand__mark" aria-hidden="true">L</span>
+          <img
+            class="brand__mark"
+            src="/brand/lumen-mark.svg"
+            alt=""
+            width="32"
+            height="32"
+          >
           <span class="brand__name">LUMEN</span>
         </NuxtLink>
 
@@ -164,15 +170,10 @@ onBeforeUnmount(() => {
 }
 
 .brand__mark {
-  display: grid;
-  width: 1.875rem;
-  height: 1.875rem;
-  place-items: center;
-  border-radius: var(--radius-sm);
-  background: var(--color-brand);
-  color: var(--color-white);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
+  display: block;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
 }
 
 .brand__name {

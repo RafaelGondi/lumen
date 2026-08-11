@@ -69,6 +69,17 @@ export default defineNuxtConfig({
           name: 'description',
           content: 'Dashboard de gestão financeira da Lumen.',
         },
+        {
+          name: 'theme-color',
+          content: '#5184b1',
+        },
+      ],
+      link: [
+        {
+          rel: 'icon',
+          type: 'image/svg+xml',
+          href: '/favicon.svg',
+        },
       ],
     },
   },
