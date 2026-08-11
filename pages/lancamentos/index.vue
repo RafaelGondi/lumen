@@ -733,4 +733,136 @@ function itemMeta(item: SpendingCalendarItem) {
     max-height: none;
   }
 }
+
+@media (max-width: 720px) {
+  .calendar-page {
+    gap: var(--space-4);
+  }
+
+  .calendar-board :deep(.ak-card__body) {
+    padding: var(--space-4);
+  }
+
+  .calendar-board__toolbar {
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+
+  .calendar-board__range {
+    display: none;
+  }
+
+  .calendar-board__filters {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .calendar-board__filters :deep(.ui-segmented) {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .calendar-board__filters :deep(.ui-segmented__option) {
+    min-width: 0;
+    padding-inline: var(--space-2);
+  }
+
+  .calendar-board__counter {
+    width: 100%;
+    text-align: right;
+  }
+
+  .calendar-grid__head,
+  .calendar-grid__body {
+    gap: 0.375rem;
+  }
+
+  .calendar-grid__head span {
+    font-size: 0.6875rem;
+  }
+
+  .calendar-day {
+    min-height: 4rem;
+    padding: 0.5rem 0.375rem;
+    align-items: stretch;
+    gap: 0.25rem;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .calendar-day__number {
+    min-width: 0;
+    justify-content: center;
+    font-size: 0.875rem;
+    line-height: 1;
+  }
+
+  .calendar-day__number em {
+    max-width: 2rem;
+    overflow: hidden;
+    font-size: 0.5625rem;
+    text-overflow: ellipsis;
+  }
+
+  .calendar-day__amount {
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    color: var(--color-ink-muted);
+    font-size: 0.625rem;
+    line-height: 1.15;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .calendar-day__amount :deep(.ui-money) {
+    display: inline;
+    max-width: 100%;
+  }
+
+  .calendar-day__amount :deep(.ui-money__symbol) {
+    margin-right: 0.2em;
+    font-size: 0.625rem;
+  }
+
+  .calendar-day__amount :deep(.ui-money__decimals) {
+    display: none;
+  }
+
+  .calendar-stats {
+    gap: var(--space-3);
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+  }
+
+  .calendar-stats strong {
+    font-size: var(--text-lg);
+  }
+
+  .calendar-panel {
+    padding: var(--space-4);
+  }
+}
+
+@media (max-width: 420px) {
+  .calendar-board :deep(.ak-card__body) {
+    padding-inline: var(--space-3);
+  }
+
+  .calendar-grid__head,
+  .calendar-grid__body {
+    gap: 0.3125rem;
+  }
+
+  .calendar-day {
+    min-height: 3.75rem;
+    padding-inline: 0.25rem;
+  }
+
+  .calendar-day__amount {
+    font-size: 0.5625rem;
+  }
+}
 </style>
