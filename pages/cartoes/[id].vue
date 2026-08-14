@@ -270,6 +270,61 @@ const filteredEntries = computed(() => {
   )
 })
 
+type InvoiceEntry = CardInvoiceDetail['entries'][number]
+
+type DateEntryGroup = {
+  key: string
+  label: string
+  weekday: string
+  total: number
+  entries: InvoiceEntry[]
+}
+
+function entryPurchaseDate(entry: InvoiceEntry) {
+  return entry.purchaseDate || entry.date
+}
+
+function formatDateGroup(isoDate: string) {
+  const date = new Date(`${isoDate}T12:00:00`)
+  if (Number.isNaN(date.getTime())) {
+    return { label: formatDateBr(isoDate), weekday: '' }
+  }
+
+  return {
+    label: new Intl.DateTimeFormat('pt-BR', {
+      day: 'numeric',
+      month: 'long',
+    }).format(date),
+    weekday: new Intl.DateTimeFormat('pt-BR', {
+      weekday: 'long',
+    }).format(date).replace(/^./, (letter) => letter.toUpperCase()),
+  }
+}
+
+const dateGroups = computed<DateEntryGroup[]>(() => {
+  const groups = new Map<string, DateEntryGroup>()
+
+  for (const entry of filteredEntries.value) {
+    const key = entryPurchaseDate(entry)
+    const current = groups.get(key)
+    if (current) {
+      current.entries.push(entry)
+      current.total = roundMoney(current.total + entry.amount)
+      continue
+    }
+
+    const formatted = formatDateGroup(key)
+    groups.set(key, {
+      key,
+      ...formatted,
+      total: roundMoney(entry.amount),
+      entries: [entry],
+    })
+  }
+
+  return [...groups.values()]
+})
+
 watch(sortBy, (key) => {
   sortDir.value = defaultCardSortDir(key)
   if (isGroupedSortKey(key)) {
@@ -687,7 +742,40 @@ async function onPaymentSaved() {
           />
         </div>
 
-        <div v-if="filteredEntries.length && showCategoryGroups" class="card-entry-groups">
+        <div
+          v-if="filteredEntries.length && sortBy === 'date'"
+          class="card-date-groups"
+        >
+          <section
+            v-for="group in dateGroups"
+            :key="group.key"
+            class="card-date-group"
+          >
+            <header class="card-date-group__header">
+              <div class="card-date-group__date">
+                <strong>{{ group.label }}</strong>
+                <span>
+                  <template v-if="group.weekday">{{ group.weekday }} · </template>
+                  {{ group.entries.length }}
+                  {{ group.entries.length === 1 ? 'compra' : 'compras' }}
+                  · <UiMoney :value="group.total" />
+                </span>
+              </div>
+            </header>
+            <div class="card-date-group__body">
+              <CardsCardInvoiceEntryRow
+                v-for="entry in group.entries"
+                :key="entry.id"
+                :entry="entry"
+                @duplicate="openDuplicateDrawer(entry)"
+                @edit="openExpenseDrawer(entry)"
+                @remove="removeExpense(entry)"
+              />
+            </div>
+          </section>
+        </div>
+
+        <div v-else-if="filteredEntries.length && showCategoryGroups" class="card-entry-groups">
           <section
             v-for="group in categoryGroups"
             :key="group.key"
@@ -1152,6 +1240,40 @@ async function onPaymentSaved() {
 
 .card-entry-wrap + .card-entry-wrap {
   border-top: 1px solid var(--color-border);
+}
+
+.card-date-group + .card-date-group {
+  margin-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.card-date-group__header {
+  padding: var(--space-3) var(--space-5) var(--space-2);
+  background: var(--color-surface);
+}
+
+.card-date-group__date {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.card-date-group__date strong {
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  line-height: 1.3;
+}
+
+.card-date-group__date span {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.card-date-group__body :deep(.card-entry:last-child) {
+  border-bottom: 0;
 }
 
 .card-entry-groups {
