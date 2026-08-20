@@ -429,6 +429,28 @@ function migrate(database: Database.Database) {
   migrateCardInvoiceAdjustments(database)
   migrateCardInvoicePayments(database)
   migrateSpendingLimits(database)
+  migrateProjectionSnapshots(database)
+}
+
+function migrateProjectionSnapshots(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS projection_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      label TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('auto', 'manual')),
+      snapshot_month TEXT NOT NULL,
+      horizon_months INTEGER NOT NULL,
+      points_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_projection_snapshots_month
+      ON projection_snapshots (snapshot_month DESC, created_at DESC);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_projection_snapshots_auto_month
+      ON projection_snapshots (snapshot_month)
+      WHERE kind = 'auto';
+  `)
 }
 
 function migrateSpendingLimits(database: Database.Database) {

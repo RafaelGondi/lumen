@@ -184,6 +184,8 @@ function projectedAccountSigned(
 ): number | null {
   // Alinhado ao previsto do dashboard: unpaid não entra no saldo projetado.
   if (occurrence.paymentState === 'unpaid') return null
+  // Transferências só movem dinheiro entre contas e não alteram o consolidado.
+  if (occurrence.type === 'transfer') return 0
   return occurrence.type === 'income' ? occurrence.amount : -occurrence.amount
 }
 
@@ -240,6 +242,49 @@ function collectProjectedMovements(
         date: dueDate,
       })
     }
+  }
+
+  return result
+}
+
+/**
+ * Calcula vários fechamentos mensais em uma única passagem. O relatório de
+ * fluxo detalhado continua usando a lógica diária; projeções longas evitam
+ * reconstruir as mesmas ocorrências e faturas para cada mês do horizonte.
+ */
+export function getProjectedBalancesAtDates(
+  db: Database.Database,
+  dates: string[],
+) {
+  const uniqueDates = [...new Set(dates)].sort()
+  const result = new Map<string, number>()
+  if (!uniqueDates.length) return result
+
+  const today = todayLocal()
+  const futureDates = uniqueDates.filter((date) => date > today)
+  for (const date of uniqueDates.filter((item) => item <= today)) {
+    result.set(date, getSaldoBancarioTotal(db, date))
+  }
+  if (!futureDates.length) return result
+
+  const movements = collectProjectedMovements(
+    db,
+    loadActiveCards(db),
+    today,
+    futureDates.at(-1)!,
+  ).sort((a, b) => a.date.localeCompare(b.date))
+
+  let balance = getSaldoBancarioTotal(db, today)
+  let movementIndex = 0
+  for (const date of futureDates) {
+    while (
+      movementIndex < movements.length &&
+      movements[movementIndex]!.date <= date
+    ) {
+      balance = roundMoney(balance + movements[movementIndex]!.signedAmount)
+      movementIndex += 1
+    }
+    result.set(date, balance)
   }
 
   return result

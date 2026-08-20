@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const tabs = [
   { label: 'Fluxo de caixa', to: '/relatorios' },
+  { label: 'Projeção', to: '/relatorios/projecao' },
   { label: 'Por categoria', to: '/relatorios/categorias' },
 ]
 </script>
@@ -12,7 +13,7 @@ const tabs = [
       :key="tab.to"
       :to="tab.to"
       class="report-tabs__item"
-      active-class="is-active"
+      exact-active-class="is-active"
     >
       {{ tab.label }}
     </NuxtLink>
