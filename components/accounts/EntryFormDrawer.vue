@@ -584,6 +584,12 @@ async function save() {
           placeholder="Ex: AMZN*MKTP BR 7K9QP2..."
         />
       </div>
+      <CategoriesCategorizationSuggestion
+        :enabled="open && !isEditing && categoryId === null"
+        :type="entryType"
+        :description="description"
+        :statement-name="statementName"
+      />
       <div class="entry-form__section">
         <p class="entry-form__label">Notas</p>
         <textarea

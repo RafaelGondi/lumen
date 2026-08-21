@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { FolderTree, Plus, Search, Tags } from '@lucide/vue'
+import { FolderTree, Plus, Search, Sparkles, Tags } from '@lucide/vue'
 import type { Category, CategoryType, Supercategory } from '~/types/category'
+import type {
+  CategorizationRule,
+  CategorizationRulePayload,
+} from '~/types/categorizationRule'
 
 type TypeFilter = 'all' | CategoryType
 
-const activeTab = ref<'categories' | 'supercategories'>('categories')
+const activeTab = ref<'categories' | 'supercategories' | 'rules'>('categories')
 const search = ref('')
 const typeFilter = ref<TypeFilter>('all')
 
@@ -22,6 +26,14 @@ const {
   default: () => [],
 })
 
+const {
+  data: rules,
+  pending: rulesPending,
+  refresh: refreshRules,
+} = await useFetch<CategorizationRule[]>('/api/categorization-rules', {
+  default: () => [],
+})
+
 const tabs = computed(() => [
   { id: 'categories', label: 'Categorias', count: categories.value.length },
   {
@@ -29,6 +41,7 @@ const tabs = computed(() => [
     label: 'Supercategorias',
     count: supercategories.value.length,
   },
+  { id: 'rules', label: 'Regras inteligentes', count: rules.value.length },
 ])
 
 const typeFilterOptions: { value: TypeFilter; label: string }[] = [
@@ -67,6 +80,16 @@ const filteredCategories = computed(() => {
   })
 })
 
+const filteredRules = computed(() => {
+  const term = search.value.trim().toLowerCase()
+  if (!term) return rules.value
+  return rules.value.filter(
+    (rule) =>
+      rule.pattern.toLowerCase().includes(term) ||
+      rule.categoryName.toLowerCase().includes(term),
+  )
+})
+
 /** Sair de um tipo sem pendências deixaria a lista vazia sem explicação. */
 watch(orphanCount, (count) => {
   if (count === 0) onlyOrphans.value = false
@@ -77,6 +100,8 @@ const editingCategory = ref<Category | null>(null)
 
 const supercategoryDrawerOpen = ref(false)
 const editingSupercategory = ref<Supercategory | null>(null)
+const ruleDrawerOpen = ref(false)
+const editingRule = ref<CategorizationRule | null>(null)
 
 function openCategoryDrawer(category: Category | null) {
   editingCategory.value = category
@@ -88,8 +113,17 @@ function openSupercategoryDrawer(supercategory: Supercategory | null) {
   supercategoryDrawerOpen.value = true
 }
 
+function openRuleDrawer(rule: CategorizationRule | null) {
+  editingRule.value = rule
+  ruleDrawerOpen.value = true
+}
+
 async function refreshAll() {
-  await Promise.all([refreshCategories(), refreshSupercategories()])
+  await Promise.all([
+    refreshCategories(),
+    refreshSupercategories(),
+    refreshRules(),
+  ])
 }
 
 async function removeCategory(category: Category) {
@@ -112,6 +146,27 @@ async function removeSupercategory(supercategory: Supercategory) {
   })
   await refreshAll()
 }
+
+async function toggleRule(rule: CategorizationRule) {
+  const payload: CategorizationRulePayload = {
+    field: rule.field,
+    operator: rule.operator,
+    pattern: rule.pattern,
+    categoryId: rule.categoryId,
+    active: !rule.active,
+  }
+  await $fetch(`/api/categorization-rules/${rule.id}`, {
+    method: 'PUT',
+    body: payload,
+  })
+  await refreshRules()
+}
+
+async function removeRule(rule: CategorizationRule) {
+  if (!window.confirm(`Excluir a regra para “${rule.pattern}”?`)) return
+  await $fetch(`/api/categorization-rules/${rule.id}`, { method: 'DELETE' })
+  await refreshRules()
+}
 </script>
 
 <template>
@@ -122,16 +177,20 @@ async function removeSupercategory(supercategory: Supercategory) {
       description="Gerencie categorias e supercategorias dos seus lançamentos."
     >
       <template #actions>
-        <UiButton
-          v-if="activeTab === 'categories'"
-          @click="openCategoryDrawer(null)"
-        >
+        <UiButton v-if="activeTab === 'categories'" @click="openCategoryDrawer(null)">
           <template #leading><Plus /></template>
           Nova categoria
         </UiButton>
-        <UiButton v-else @click="openSupercategoryDrawer(null)">
+        <UiButton
+          v-else-if="activeTab === 'supercategories'"
+          @click="openSupercategoryDrawer(null)"
+        >
           <template #leading><Plus /></template>
           Nova supercategoria
+        </UiButton>
+        <UiButton v-else @click="openRuleDrawer(null)">
+          <template #leading><Sparkles /></template>
+          Nova regra
         </UiButton>
       </template>
     </PageHeading>
@@ -203,7 +262,7 @@ async function removeSupercategory(supercategory: Supercategory) {
       </UiCard>
     </template>
 
-    <template v-else>
+    <template v-else-if="activeTab === 'supercategories'">
       <div
         v-if="supercategoriesPending"
         class="supercategories-grid"
@@ -238,6 +297,68 @@ async function removeSupercategory(supercategory: Supercategory) {
       </UiCard>
     </template>
 
+    <template v-else>
+      <div class="rules-intro">
+        <div class="rules-intro__icon"><Sparkles aria-hidden="true" /></div>
+        <div>
+          <strong>Categorize novos lançamentos sem esforço</strong>
+          <p>
+            As regras analisam descrição e nome no extrato. Elas só agem quando
+            nenhuma categoria foi escolhida manualmente.
+          </p>
+        </div>
+        <span>Regra mais específica vence</span>
+      </div>
+
+      <div class="rules-toolbar">
+        <div class="categories-toolbar__search">
+          <Search aria-hidden="true" />
+          <input
+            v-model="search"
+            type="search"
+            placeholder="Buscar regra ou categoria..."
+            aria-label="Buscar regra"
+          />
+        </div>
+      </div>
+
+      <UiCard v-if="rulesPending" padding="none">
+        <div class="rules-skeleton">
+          <UiSkeleton v-for="index in 4" :key="index" height="5.25rem" radius="sm" />
+        </div>
+      </UiCard>
+      <UiCard v-else-if="filteredRules.length" padding="none">
+        <div class="rules-list">
+          <CategoriesCategorizationRuleCard
+            v-for="rule in filteredRules"
+            :key="rule.id"
+            :rule="rule"
+            @edit="openRuleDrawer(rule)"
+            @toggle="toggleRule(rule)"
+            @remove="removeRule(rule)"
+          />
+        </div>
+      </UiCard>
+      <UiCard v-else padding="none">
+        <UiEmptyState
+          :title="rules.length ? 'Nenhuma regra encontrada' : 'Nenhuma regra inteligente'"
+          :description="
+            rules.length
+              ? 'Tente buscar por outro texto ou categoria.'
+              : 'Crie uma regra para categorizar automaticamente novas compras e movimentações.'
+          "
+        >
+          <template #icon><Sparkles /></template>
+          <template v-if="!rules.length" #action>
+            <UiButton @click="openRuleDrawer(null)">
+              <template #leading><Plus /></template>
+              Criar primeira regra
+            </UiButton>
+          </template>
+        </UiEmptyState>
+      </UiCard>
+    </template>
+
     <CategoriesCategoryFormDrawer
       v-model:open="categoryDrawerOpen"
       :category="editingCategory"
@@ -248,6 +369,12 @@ async function removeSupercategory(supercategory: Supercategory) {
       v-model:open="supercategoryDrawerOpen"
       :supercategory="editingSupercategory"
       @saved="refreshAll"
+    />
+    <CategoriesCategorizationRuleFormDrawer
+      v-model:open="ruleDrawerOpen"
+      :rule="editingRule"
+      :categories="categories"
+      @saved="refreshRules"
     />
   </div>
 </template>
@@ -374,6 +501,36 @@ async function removeSupercategory(supercategory: Supercategory) {
   gap: var(--space-4);
 }
 
+.rules-intro {
+  display: flex;
+  margin: var(--space-5) 0 0;
+  padding: var(--space-4) var(--space-5);
+  align-items: center;
+  gap: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.rules-intro__icon {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.rules-intro__icon svg { width: 1.1rem; height: 1.1rem; }
+.rules-intro > div:nth-child(2) { min-width: 0; flex: 1; }
+.rules-intro strong { font-size: var(--text-sm); }
+.rules-intro p { margin-top: var(--space-1); color: var(--color-ink-muted); font-size: var(--text-xs); line-height: 1.45; }
+.rules-intro > span { color: var(--color-ink-muted); font-size: var(--text-xs); white-space: nowrap; }
+.rules-toolbar { display: flex; margin: var(--space-4) 0; }
+.rules-skeleton { overflow: hidden; }
+
 .categories-grid > *,
 .supercategories-grid > * {
   min-width: 0;
@@ -421,5 +578,9 @@ async function removeSupercategory(supercategory: Supercategory) {
   .supercategories-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .rules-intro { align-items: flex-start; }
+  .rules-intro > span { display: none; }
+  .rules-toolbar .categories-toolbar__search { width: 100%; }
 }
 </style>

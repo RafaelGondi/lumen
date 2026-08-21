@@ -6,6 +6,16 @@ export default defineEventHandler(async (event) => {
   const payload = parseEntryPayload(await readBody(event))
   const db = useDb()
 
+  const automaticRule =
+    payload.categoryId === null
+      ? findCategorizationRule(db, {
+          type: payload.type,
+          description: payload.description,
+          statementName: payload.statementName,
+        })
+      : null
+  if (automaticRule) payload.categoryId = automaticRule.categoryId
+
   const account = db
     .prepare('SELECT id FROM accounts WHERE id = ?')
     .get(payload.accountId)
@@ -104,11 +114,13 @@ export default defineEventHandler(async (event) => {
     })
 
   const id = Number(result.lastInsertRowid)
+  if (automaticRule) recordCategorizationMatch(db, automaticRule.ruleId)
   setResponseStatus(event, 201)
 
   return {
     id,
     ids: [id],
     balance: accountBalance(db, payload.accountId),
+    appliedRule: automaticRule,
   }
 })

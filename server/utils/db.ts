@@ -430,6 +430,29 @@ function migrate(database: Database.Database) {
   migrateCardInvoicePayments(database)
   migrateSpendingLimits(database)
   migrateProjectionSnapshots(database)
+  migrateCategorizationRules(database)
+}
+
+function migrateCategorizationRules(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS categorization_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      match_field TEXT NOT NULL
+        CHECK (match_field IN ('description', 'statement_name', 'either')),
+      match_operator TEXT NOT NULL
+        CHECK (match_operator IN ('contains', 'starts_with', 'equals')),
+      pattern TEXT NOT NULL,
+      category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+      active INTEGER NOT NULL DEFAULT 1,
+      match_count INTEGER NOT NULL DEFAULT 0,
+      last_matched_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_categorization_rules_active_category
+      ON categorization_rules (active, category_id);
+  `)
 }
 
 function migrateProjectionSnapshots(database: Database.Database) {

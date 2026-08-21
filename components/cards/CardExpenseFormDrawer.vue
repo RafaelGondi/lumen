@@ -440,6 +440,12 @@ async function save() {
           placeholder="Ex: AMZN*MKTP BR..."
         />
       </div>
+      <CategoriesCategorizationSuggestion
+        :enabled="open && !isEditing && categoryId === null"
+        type="expense"
+        :description="description"
+        :statement-name="statementName"
+      />
       <div class="card-expense-form__section">
         <p class="card-expense-form__label">Notas</p>
         <textarea

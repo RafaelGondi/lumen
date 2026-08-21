@@ -9,6 +9,16 @@ export default defineEventHandler(async (event) => {
   const payload = parseCardExpensePayload(await readBody(event))
   const db = useDb()
 
+  const automaticRule =
+    payload.categoryId === null
+      ? findCategorizationRule(db, {
+          type: 'expense',
+          description: payload.description,
+          statementName: payload.statementName,
+        })
+      : null
+  if (automaticRule) payload.categoryId = automaticRule.categoryId
+
   const card = db
     .prepare('SELECT id, closing_day AS closingDay FROM cards WHERE id = ?')
     .get(cardId) as { id: number; closingDay: number } | undefined
@@ -79,9 +89,10 @@ export default defineEventHandler(async (event) => {
     })
 
   setResponseStatus(event, 201)
+  if (automaticRule) recordCategorizationMatch(db, automaticRule.ruleId)
   return {
     id: Number(result.lastInsertRowid),
     invoiceMonth: transacaoFaturaMonth(startDate, card.closingDay),
+    appliedRule: automaticRule,
   }
 })
-
