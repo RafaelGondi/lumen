@@ -13,6 +13,7 @@ const parts = computed(() => {
   const raw = formatter.formatToParts(props.value)
 
   return {
+    sign: raw.find((part) => part.type === 'minusSign')?.value ?? '',
     symbol: raw.find((part) => part.type === 'currency')?.value ?? 'R$',
     integer: raw
       .filter((part) => part.type === 'integer' || part.type === 'group')
@@ -28,6 +29,7 @@ const parts = computed(() => {
 
 <template>
   <span class="ui-money numeric">
+    <span v-if="parts.sign" class="ui-money__sign">{{ parts.sign }}</span>
     <span class="ui-money__symbol">{{ parts.symbol }}</span>
     <span class="ui-money__integer">{{ parts.integer }}</span>
     <span class="ui-money__decimals">{{ parts.decimals }}</span>
@@ -51,6 +53,10 @@ const parts = computed(() => {
   font-size: max(var(--text-2xs), 0.62em);
   font-weight: var(--weight-medium);
   opacity: 0.62;
+}
+
+.ui-money__sign {
+  margin-right: 0.18em;
 }
 
 .ui-money__decimals {

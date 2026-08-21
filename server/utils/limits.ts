@@ -556,17 +556,24 @@ export function buildLimitsReport(
   if (scope === 'category') {
     const categories = db
       .prepare(
-        `SELECT id, name, color, icon
+        `SELECT id, name, color, icon, supercategory_id AS supercategoryId
          FROM categories
          WHERE type = 'expense'
          ORDER BY name COLLATE NOCASE ASC`,
       )
-      .all() as { id: number; name: string; color: string; icon: string }[]
+      .all() as {
+      id: number
+      name: string
+      color: string
+      icon: string
+      supercategoryId: number | null
+    }[]
 
     for (const category of categories) {
       const limit = limitsMap.get(category.id) ?? null
       rows.push({
         referenceId: category.id,
+        parentReferenceId: category.supercategoryId ?? 0,
         label: category.name,
         color: category.color,
         icon: category.icon,
@@ -581,6 +588,7 @@ export function buildLimitsReport(
       const limit = limitsMap.get(0) ?? null
       rows.push({
         referenceId: 0,
+        parentReferenceId: 0,
         label: 'Sem categoria',
         color: '#94a3b8',
         icon: 'tag',
@@ -603,6 +611,7 @@ export function buildLimitsReport(
       const limit = limitsMap.get(supercategory.id) ?? null
       rows.push({
         referenceId: supercategory.id,
+        parentReferenceId: null,
         label: supercategory.name,
         color: supercategory.color,
         icon: supercategory.icon,
@@ -617,6 +626,7 @@ export function buildLimitsReport(
       const limit = limitsMap.get(0) ?? null
       rows.push({
         referenceId: 0,
+        parentReferenceId: null,
         label: 'Sem supercategoria',
         color: '#94a3b8',
         icon: 'folder-tree',

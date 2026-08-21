@@ -21,6 +21,8 @@ export type LimitScope = 'category' | 'supercategory'
 
 export interface LimitRow {
   referenceId: number
+  /** Supercategoria da categoria. Null para linhas de supercategoria. */
+  parentReferenceId: number | null
   label: string
   color: string
   icon: string

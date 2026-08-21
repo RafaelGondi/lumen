@@ -4,9 +4,11 @@ withDefaults(
     icon: string
     color: string
     size?: 'sm' | 'md' | 'lg'
+    tone?: 'solid' | 'soft'
   }>(),
   {
     size: 'md',
+    tone: 'solid',
   },
 )
 </script>
@@ -14,8 +16,8 @@ withDefaults(
 <template>
   <span
     class="icon-chip"
-    :class="`icon-chip--${size}`"
-    :style="{ background: color }"
+    :class="[`icon-chip--${size}`, `icon-chip--${tone}`]"
+    :style="{ '--icon-chip-color': color }"
     aria-hidden="true"
   >
     <component :is="categoryIcon(icon)" />
@@ -28,7 +30,17 @@ withDefaults(
   flex-shrink: 0;
   place-items: center;
   border-radius: var(--radius-sm);
+  background: var(--icon-chip-color);
   color: var(--color-white);
+}
+
+.icon-chip--soft {
+  background: color-mix(
+    in srgb,
+    var(--icon-chip-color) 16%,
+    var(--color-surface)
+  );
+  color: var(--icon-chip-color);
 }
 
 .icon-chip--sm {

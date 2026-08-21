@@ -35,6 +35,7 @@ watch(
     recurring.value = row?.recurring ?? false
     errorMessage.value = ''
   },
+  { immediate: true },
 )
 
 const title = computed(() => {

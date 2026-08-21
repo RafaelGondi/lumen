@@ -8,7 +8,7 @@ const navigation = [
   { label: 'Visão geral', to: '/' },
   { label: 'Lançamentos', to: '/lancamentos' },
   { label: 'Categorias', to: '/categorias' },
-  { label: 'Limites', to: '/limites' },
+  { label: 'Orçamento', to: '/limites' },
   { label: 'Contas', to: '/contas' },
   { label: 'Cartões', to: '/cartoes' },
   { label: 'Relatórios', to: '/relatorios' },
