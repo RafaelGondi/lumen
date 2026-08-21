@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const tabs = [
   { label: 'Fluxo de caixa', to: '/relatorios' },
+  { label: 'Evolução', to: '/relatorios/evolucao' },
   { label: 'Projeção', to: '/relatorios/projecao' },
   { label: 'Por categoria', to: '/relatorios/categorias' },
 ]
