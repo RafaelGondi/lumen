@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import {
+  BarController,
   BarElement,
   CategoryScale,
   Chart as ChartJS,
   Filler,
   Legend,
+  LineController,
   LineElement,
   LinearScale,
   PointElement,
@@ -16,10 +18,12 @@ import { Chart } from 'vue-chartjs'
 import type { EvolutionChartMode, EvolutionMonth } from '~/types/evolution'
 
 ChartJS.register(
+  BarController,
   BarElement,
   CategoryScale,
   Filler,
   Legend,
+  LineController,
   LineElement,
   LinearScale,
   PointElement,

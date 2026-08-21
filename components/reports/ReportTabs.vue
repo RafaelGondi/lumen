@@ -2,6 +2,7 @@
 const tabs = [
   { label: 'Fluxo de caixa', to: '/relatorios' },
   { label: 'Evolução', to: '/relatorios/evolucao' },
+  { label: 'Comparação', to: '/relatorios/comparacao' },
   { label: 'Projeção', to: '/relatorios/projecao' },
   { label: 'Por categoria', to: '/relatorios/categorias' },
 ]
