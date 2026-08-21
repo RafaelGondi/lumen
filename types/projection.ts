@@ -1,9 +1,13 @@
 export type ProjectionSnapshotKind = 'auto' | 'manual'
+export type ProjectionBalanceMode = 'best' | 'worst'
 
 export interface ProjectionPoint {
   month: string
   label: string
+  /** Saldo de fechamento, mantido para compatibilidade com snapshots antigos. */
   balance: number
+  bestBalance?: number
+  worstBalance?: number
 }
 export interface ProjectionSnapshot {
   id: number
@@ -13,6 +17,8 @@ export interface ProjectionSnapshot {
   horizonMonths: number
   points: ProjectionPoint[]
   createdAt: string
+  /** Snapshots anteriores ao seletor guardavam apenas o fechamento mensal. */
+  hasMonthlyExtremes: boolean
 }
 
 export interface ProjectionReport {

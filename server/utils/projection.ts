@@ -54,31 +54,49 @@ export function buildProjectionPoints(
   horizonMonths = SNAPSHOT_HORIZON,
 ): ProjectionPoint[] {
   const months: string[] = []
-  const monthEnds: string[] = []
+  const datesByMonth = new Map<string, string[]>()
+  const allDates: string[] = []
   let cursor = `${startMonth}-01`
 
   for (let index = 0; index < horizonMonths; index += 1) {
     const month = cursor.slice(0, 7)
     const [year, monthNumber] = month.split('-').map(Number)
     const lastDay = new Date(year!, monthNumber!, 0).getDate()
+    const dates = Array.from({ length: lastDay }, (_, dayIndex) =>
+      `${month}-${String(dayIndex + 1).padStart(2, '0')}`,
+    )
     months.push(month)
-    monthEnds.push(`${month}-${String(lastDay).padStart(2, '0')}`)
+    datesByMonth.set(month, dates)
+    allDates.push(...dates)
     cursor = addMonthsLocal(cursor, 1)
   }
 
-  const balances = getProjectedBalancesAtDates(db, monthEnds)
-  return months.map((month, index) => ({
-    month,
-    label: pointLabel(month),
-    balance: roundMoney(balances.get(monthEnds[index]!) ?? 0),
-  }))
+  const balances = getProjectedBalancesAtDates(db, allDates)
+  return months.map((month) => {
+    const dates = datesByMonth.get(month) ?? []
+    const dailyBalances = dates.map((date) => balances.get(date) ?? 0)
+    const closingBalance = dailyBalances.at(-1) ?? 0
+
+    return {
+      month,
+      label: pointLabel(month),
+      balance: roundMoney(closingBalance),
+      bestBalance: roundMoney(Math.max(...dailyBalances)),
+      worstBalance: roundMoney(Math.min(...dailyBalances)),
+    }
+  })
 }
 
 function parseSnapshot(row: SnapshotRow): ProjectionSnapshot | null {
   try {
     const points = JSON.parse(row.pointsJson) as ProjectionPoint[]
     if (!Array.isArray(points)) return null
-    return { ...row, points }
+    const hasMonthlyExtremes = points.every(
+      (point) =>
+        Number.isFinite(point.bestBalance) &&
+        Number.isFinite(point.worstBalance),
+    )
+    return { ...row, points, hasMonthlyExtremes }
   } catch {
     return null
   }
@@ -131,6 +149,7 @@ export function createProjectionSnapshot(
     horizonMonths: SNAPSHOT_HORIZON,
     points,
     createdAt: date,
+    hasMonthlyExtremes: true,
   }
 }
 

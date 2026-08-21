@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { Camera, Clock3, Trash2, TrendingUp } from '@lucide/vue'
-import type { ProjectionReport, ProjectionSnapshot } from '~/types/projection'
+import type {
+  ProjectionBalanceMode,
+  ProjectionPoint,
+  ProjectionReport,
+  ProjectionSnapshot,
+} from '~/types/projection'
+import { roundMoney } from '~/utils/dateMoney'
 
 const horizon = ref<'6' | '12' | '18'>('12')
+const balanceMode = ref<ProjectionBalanceMode>('worst')
 const selectedSnapshotIds = ref<number[]>([])
 const creating = ref(false)
 const deletingId = ref<number | null>(null)
@@ -41,14 +48,65 @@ const selectedSnapshots = computed(() => {
   return (report.value?.snapshots ?? []).filter((item) => selected.has(item.id))
 })
 
-const lastPoint = computed(() => report.value?.points.at(-1) ?? null)
+function currentPointForMode(point: ProjectionPoint): ProjectionPoint {
+  const balance =
+    balanceMode.value === 'best'
+      ? (point.bestBalance ?? point.balance)
+      : (point.worstBalance ?? point.balance)
+  return { ...point, balance }
+}
+
+const displayedPoints = computed(() =>
+  (report.value?.points ?? []).map(currentPointForMode),
+)
+
+function snapshotPointForMode(point: ProjectionPoint): ProjectionPoint {
+  const exactBalance =
+    balanceMode.value === 'best' ? point.bestBalance : point.worstBalance
+  if (Number.isFinite(exactBalance)) {
+    return { ...point, balance: exactBalance! }
+  }
+
+  // Snapshots antigos preservam apenas o fechamento. Para compará-los na
+  // mesma métrica, transportamos a amplitude intramês da projeção atual sem
+  // alterar o fechamento histórico salvo no snapshot.
+  const currentPoint = report.value?.points.find(
+    (item) => item.month === point.month,
+  )
+  if (!currentPoint) return point
+  const currentExtreme =
+    balanceMode.value === 'best'
+      ? currentPoint.bestBalance
+      : currentPoint.worstBalance
+  if (!Number.isFinite(currentExtreme)) return point
+
+  return {
+    ...point,
+    balance: roundMoney(
+      point.balance + currentExtreme! - currentPoint.balance,
+    ),
+  }
+}
+
+const displayedSnapshots = computed(() =>
+  selectedSnapshots.value.map((snapshot) => ({
+    ...snapshot,
+    label: `${snapshot.label} · ${balanceModeLabel.value}`,
+    points: snapshot.points.map(snapshotPointForMode),
+  })),
+)
+const hasLegacyComparison = computed(() =>
+  selectedSnapshots.value.some((snapshot) => !snapshot.hasMonthlyExtremes),
+)
+
+const lastPoint = computed(() => displayedPoints.value.at(-1) ?? null)
 const sixMonthPoint = computed(() => {
-  const points = report.value?.points ?? []
+  const points = displayedPoints.value
   return points[Math.min(5, points.length - 1)] ?? null
 })
 
 const latestSnapshotDelta = computed(() => {
-  const snapshot = selectedSnapshots.value[0]
+  const snapshot = displayedSnapshots.value[0]
   const current = lastPoint.value
   if (!snapshot || !current) return null
   const oldPoint = snapshot.points.find((point) => point.month === current.month)
@@ -61,6 +119,15 @@ const horizonOptions = [
   { value: '12' as const, label: '12 meses' },
   { value: '18' as const, label: '18 meses' },
 ]
+
+const balanceModeOptions = [
+  { value: 'worst' as const, label: 'Pior saldo' },
+  { value: 'best' as const, label: 'Melhor saldo' },
+]
+
+const balanceModeLabel = computed(() =>
+  balanceMode.value === 'best' ? 'Melhor saldo' : 'Pior saldo',
+)
 
 function toggleSnapshot(id: number) {
   if (selectedSnapshotIds.value.includes(id)) {
@@ -166,12 +233,12 @@ function formatDate(value: string) {
             <span>Contas bancárias</span>
           </UiCard>
           <UiCard class="projection-kpi">
-            <p>Em 6 meses</p>
+            <p>{{ balanceModeLabel }} em 6 meses</p>
             <strong><UiMoney :value="sixMonthPoint?.balance ?? 0" /></strong>
             <span>{{ sixMonthPoint?.label }}</span>
           </UiCard>
           <UiCard class="projection-kpi">
-            <p>Fim da projeção</p>
+            <p>{{ balanceModeLabel }} no fim da projeção</p>
             <strong><UiMoney :value="lastPoint?.balance ?? 0" /></strong>
             <span v-if="latestSnapshotDelta !== null">
               {{ latestSnapshotDelta >= 0 ? '+' : '' }}{{ formatMoney(latestSnapshotDelta) }}
@@ -196,6 +263,11 @@ function formatDate(value: string) {
 
           <div class="projection-card__actions">
             <UiSegmentedControl
+              v-model="balanceMode"
+              :options="balanceModeOptions"
+              aria-label="Saldo mensal exibido"
+            />
+            <UiSegmentedControl
               v-model="horizon"
               :options="horizonOptions"
               aria-label="Horizonte da projeção"
@@ -217,49 +289,57 @@ function formatDate(value: string) {
             <span>Comparar com</span>
           </div>
 
-          <div v-if="report?.snapshots.length" class="projection-snapshots__list">
-            <div
-              v-for="snapshot in report.snapshots"
-              :key="snapshot.id"
-              class="projection-snapshot"
-              :class="{ 'is-active': selectedSnapshotIds.includes(snapshot.id) }"
-            >
-              <button
-                type="button"
-                :title="`Criado em ${formatDate(snapshot.createdAt)}`"
-                @click="toggleSnapshot(snapshot.id)"
+          <div class="projection-snapshots__content">
+            <div v-if="report?.snapshots.length" class="projection-snapshots__list">
+              <div
+                v-for="snapshot in report.snapshots"
+                :key="snapshot.id"
+                class="projection-snapshot"
+                :class="{ 'is-active': selectedSnapshotIds.includes(snapshot.id) }"
               >
-                <span class="projection-snapshot__dot" />
-                <strong>{{ snapshot.label }}</strong>
-              </button>
-              <button
-                v-if="snapshot.kind === 'manual'"
-                type="button"
-                class="projection-snapshot__delete"
-                :disabled="deletingId === snapshot.id"
-                :aria-label="`Excluir ${snapshot.label}`"
-                @click="removeSnapshot(snapshot)"
-              >
-                <Trash2 aria-hidden="true" />
-              </button>
+                <button
+                  type="button"
+                  :title="`Criado em ${formatDate(snapshot.createdAt)}`"
+                  @click="toggleSnapshot(snapshot.id)"
+                >
+                  <span class="projection-snapshot__dot" />
+                  <strong>{{ snapshot.label }}</strong>
+                </button>
+                <button
+                  v-if="snapshot.kind === 'manual'"
+                  type="button"
+                  class="projection-snapshot__delete"
+                  :disabled="deletingId === snapshot.id"
+                  :aria-label="`Excluir ${snapshot.label}`"
+                  @click="removeSnapshot(snapshot)"
+                >
+                  <Trash2 aria-hidden="true" />
+                </button>
+              </div>
             </div>
+            <p v-else class="projection-snapshots__empty">
+              O primeiro snapshot automático será criado neste mês.
+            </p>
+
+            <p v-if="hasLegacyComparison" class="projection-snapshots__legacy">
+              Nos snapshots antigos, o extremo mensal é estimado a partir do fechamento preservado.
+            </p>
           </div>
-          <p v-else class="projection-snapshots__empty">
-            O primeiro snapshot automático será criado neste mês.
-          </p>
         </section>
 
         <div class="projection-card__chart">
           <UiSkeleton v-if="pending && !report" height="23rem" radius="md" />
           <ReportsProjectionChart
             v-else-if="report"
-            :points="report.points"
-            :snapshots="selectedSnapshots"
+            :points="displayedPoints"
+            :snapshots="displayedSnapshots"
+            :current-label="`Projeção atual · ${balanceModeLabel}`"
           />
         </div>
 
         <footer class="projection-card__footer">
-          A projeção usa apenas valores já conhecidos. Gastos e receitas ainda não cadastrados
+          Cada ponto mostra o {{ balanceModeLabel.toLowerCase() }} registrado no mês.
+          A projeção usa apenas valores já conhecidos; gastos e receitas ainda não cadastrados
           alteram a curva real ao longo do tempo, e é justamente essa diferença que os snapshots preservam.
         </footer>
       </UiCard>
@@ -436,6 +516,14 @@ function formatDate(value: string) {
   white-space: nowrap;
 }
 
+.projection-snapshots__content {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
 .projection-snapshot .projection-snapshot__delete {
   padding: 0.5rem;
   color: var(--color-ink-muted);
@@ -452,6 +540,11 @@ function formatDate(value: string) {
 
 .projection-snapshots__empty {
   padding-top: 0.55rem;
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.projection-snapshots__legacy {
   color: var(--color-ink-muted);
   font-size: var(--text-xs);
 }

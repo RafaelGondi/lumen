@@ -27,6 +27,7 @@ ChartJS.register(
 const props = defineProps<{
   points: ProjectionPoint[]
   snapshots: ProjectionSnapshot[]
+  currentLabel?: string
 }>()
 
 const wrapRef = ref<HTMLElement | null>(null)
@@ -79,7 +80,7 @@ const chartData = computed<ChartData<'line', (number | null)[], string>>(() => {
     labels: props.points.map((point) => point.label),
     datasets: [
       {
-        label: 'Projeção atual',
+        label: props.currentLabel ?? 'Projeção atual',
         data: props.points.map((point) => point.balance),
         borderColor: tokens.value.current,
         backgroundColor: (context) => {
