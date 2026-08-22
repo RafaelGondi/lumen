@@ -1,7 +1,7 @@
 <script setup lang="ts">
 withDefaults(
   defineProps<{
-    variant?: 'primary' | 'secondary' | 'ghost'
+    variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
     size?: 'sm' | 'md'
     type?: 'button' | 'submit' | 'reset'
     disabled?: boolean
@@ -78,6 +78,15 @@ withDefaults(
 
 .ui-button--primary:hover:not(:disabled) {
   background: var(--color-brand-hover);
+}
+
+.ui-button--danger {
+  background: var(--color-negative-ink);
+  color: var(--color-white);
+}
+
+.ui-button--danger:hover:not(:disabled) {
+  filter: brightness(0.9);
 }
 
 .ui-button--secondary {

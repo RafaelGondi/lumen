@@ -1,19 +1,36 @@
 <script setup lang="ts">
-import { Camera, Clock3, Trash2, TrendingUp } from '@lucide/vue'
+import {
+  Camera,
+  Clock3,
+  FlaskConical,
+  Pencil,
+  Plus,
+  Trash2,
+  TrendingUp,
+} from '@lucide/vue'
 import type {
   ProjectionBalanceMode,
   ProjectionPoint,
   ProjectionReport,
+  ProjectionScenario,
   ProjectionSnapshot,
 } from '~/types/projection'
-import { roundMoney } from '~/utils/dateMoney'
+import { addMonthsLocal, roundMoney } from '~/utils/dateMoney'
 
 const horizon = ref<'6' | '12' | '18'>('12')
 const balanceMode = ref<ProjectionBalanceMode>('worst')
 const selectedSnapshotIds = ref<number[]>([])
 const creating = ref(false)
 const deletingId = ref<number | null>(null)
+const snapshotDeleteDialogOpen = ref(false)
+const pendingSnapshotDelete = ref<ProjectionSnapshot | null>(null)
 const actionError = ref('')
+const selectedScenarioId = ref<number | null>(null)
+const scenarioDrawerOpen = ref(false)
+const editingScenario = ref<ProjectionScenario | null>(null)
+const deletingScenarioId = ref<number | null>(null)
+const scenarioDeleteDialogOpen = ref(false)
+const pendingScenarioDelete = ref<ProjectionScenario | null>(null)
 
 const {
   data: report,
@@ -43,6 +60,19 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => report.value?.scenarios,
+  (scenarios) => {
+    if (
+      selectedScenarioId.value !== null &&
+      !scenarios?.some((scenario) => scenario.id === selectedScenarioId.value)
+    ) {
+      selectedScenarioId.value = null
+    }
+  },
+  { immediate: true },
+)
+
 const selectedSnapshots = computed(() => {
   const selected = new Set(selectedSnapshotIds.value)
   return (report.value?.snapshots ?? []).filter((item) => selected.has(item.id))
@@ -59,6 +89,22 @@ function currentPointForMode(point: ProjectionPoint): ProjectionPoint {
 const displayedPoints = computed(() =>
   (report.value?.points ?? []).map(currentPointForMode),
 )
+
+const selectedScenario = computed(() =>
+  (report.value?.scenarios ?? []).find(
+    (scenario) => scenario.id === selectedScenarioId.value,
+  ) ?? null,
+)
+
+const displayedScenarios = computed<ProjectionScenario[]>(() => {
+  if (!selectedScenario.value) return []
+  return [
+    {
+      ...selectedScenario.value,
+      points: selectedScenario.value.points.map(currentPointForMode),
+    },
+  ]
+})
 
 function snapshotPointForMode(point: ProjectionPoint): ProjectionPoint {
   const exactBalance =
@@ -103,6 +149,18 @@ const lastPoint = computed(() => displayedPoints.value.at(-1) ?? null)
 const sixMonthPoint = computed(() => {
   const points = displayedPoints.value
   return points[Math.min(5, points.length - 1)] ?? null
+})
+
+const scenarioLastPoint = computed(() =>
+  displayedScenarios.value[0]?.points.at(-1) ?? null,
+)
+const scenarioImpactAtEnd = computed(() => {
+  if (!scenarioLastPoint.value || !lastPoint.value) return null
+  return roundMoney(scenarioLastPoint.value.balance - lastPoint.value.balance)
+})
+const minimumScenarioMonth = computed(() => {
+  const today = report.value?.generatedAt
+  return today ? addMonthsLocal(today, 1).slice(0, 7) : ''
 })
 
 const latestSnapshotDelta = computed(() => {
@@ -165,11 +223,14 @@ async function createSnapshot() {
   }
 }
 
-async function removeSnapshot(snapshot: ProjectionSnapshot) {
-  if (import.meta.client) {
-    const confirmed = window.confirm(`Excluir “${snapshot.label}”?`)
-    if (!confirmed) return
-  }
+function requestSnapshotDelete(snapshot: ProjectionSnapshot) {
+  pendingSnapshotDelete.value = snapshot
+  snapshotDeleteDialogOpen.value = true
+}
+
+async function confirmSnapshotDelete() {
+  const snapshot = pendingSnapshotDelete.value
+  if (!snapshot) return
   deletingId.value = snapshot.id
   actionError.value = ''
   try {
@@ -186,7 +247,65 @@ async function removeSnapshot(snapshot: ProjectionSnapshot) {
       'Não foi possível excluir o snapshot.'
   } finally {
     deletingId.value = null
+    snapshotDeleteDialogOpen.value = false
+    pendingSnapshotDelete.value = null
   }
+}
+
+function openNewScenario() {
+  editingScenario.value = null
+  scenarioDrawerOpen.value = true
+}
+
+function openScenarioForEdit(scenario: ProjectionScenario) {
+  editingScenario.value = scenario
+  scenarioDrawerOpen.value = true
+}
+
+function toggleScenario(id: number) {
+  selectedScenarioId.value = selectedScenarioId.value === id ? null : id
+}
+
+async function scenarioSaved(id: number | null) {
+  await refresh()
+  if (id !== null) selectedScenarioId.value = id
+}
+
+function requestScenarioDelete(scenario: ProjectionScenario) {
+  pendingScenarioDelete.value = scenario
+  scenarioDeleteDialogOpen.value = true
+}
+
+async function confirmScenarioDelete() {
+  const scenario = pendingScenarioDelete.value
+  if (!scenario) return
+  deletingScenarioId.value = scenario.id
+  actionError.value = ''
+  try {
+    await $fetch(`/api/reports/projection-scenarios/${scenario.id}`, {
+      method: 'DELETE',
+    })
+    if (selectedScenarioId.value === scenario.id) selectedScenarioId.value = null
+    await refresh()
+  } catch (caught) {
+    actionError.value =
+      (caught as { statusMessage?: string }).statusMessage ??
+      'Não foi possível excluir o cenário.'
+  } finally {
+    deletingScenarioId.value = null
+    scenarioDeleteDialogOpen.value = false
+    pendingScenarioDelete.value = null
+  }
+}
+
+function scenarioItemLabel(item: ProjectionScenario['items'][number]) {
+  const labels = {
+    income: 'Receita',
+    expense: 'Despesa',
+    reduction: 'Redução',
+    installment: 'Compra parcelada',
+  }
+  return labels[item.type]
 }
 
 function formatMoney(value: number) {
@@ -272,6 +391,10 @@ function formatDate(value: string) {
               :options="horizonOptions"
               aria-label="Horizonte da projeção"
             />
+            <UiButton variant="secondary" @click="openNewScenario">
+              <FlaskConical aria-hidden="true" />
+              Cenário
+            </UiButton>
             <UiButton variant="secondary" :disabled="creating" @click="createSnapshot">
               <Camera aria-hidden="true" />
               {{ creating ? 'Salvando…' : 'Snapshot' }}
@@ -311,7 +434,7 @@ function formatDate(value: string) {
                   class="projection-snapshot__delete"
                   :disabled="deletingId === snapshot.id"
                   :aria-label="`Excluir ${snapshot.label}`"
-                  @click="removeSnapshot(snapshot)"
+                  @click="requestSnapshotDelete(snapshot)"
                 >
                   <Trash2 aria-hidden="true" />
                 </button>
@@ -327,12 +450,69 @@ function formatDate(value: string) {
           </div>
         </section>
 
+        <section class="projection-scenarios" aria-label="Cenários para simulação">
+          <div class="projection-scenarios__label">
+            <FlaskConical aria-hidden="true" />
+            <span>Simular</span>
+          </div>
+
+          <div class="projection-scenarios__content">
+            <div v-if="report?.scenarios.length" class="projection-scenarios__list">
+              <button
+                v-for="scenario in report.scenarios"
+                :key="scenario.id"
+                type="button"
+                class="projection-scenario"
+                :class="{ 'is-active': selectedScenarioId === scenario.id }"
+                @click="toggleScenario(scenario.id)"
+              >
+                <span class="projection-scenario__dot" />
+                <strong>{{ scenario.name }}</strong>
+                <small>{{ scenario.items.length }} {{ scenario.items.length === 1 ? 'mudança' : 'mudanças' }}</small>
+              </button>
+              <button type="button" class="projection-scenario-add" @click="openNewScenario">
+                <Plus aria-hidden="true" /> Novo cenário
+              </button>
+            </div>
+            <button v-else type="button" class="projection-scenarios__empty" @click="openNewScenario">
+              <Plus aria-hidden="true" /> Crie um cenário para testar uma decisão sem alterar seus dados.
+            </button>
+
+            <div v-if="selectedScenario" class="projection-scenario-detail">
+              <div class="projection-scenario-detail__summary">
+                <span>Impacto no fim da projeção</span>
+                <strong :class="{ 'is-negative': (scenarioImpactAtEnd ?? 0) < 0 }">
+                  {{ (scenarioImpactAtEnd ?? 0) >= 0 ? '+' : '' }}{{ formatMoney(scenarioImpactAtEnd ?? 0) }}
+                </strong>
+              </div>
+              <div class="projection-scenario-detail__items">
+                <span v-for="item in selectedScenario.items" :key="item.id">
+                  {{ scenarioItemLabel(item) }} · {{ formatMoney(item.amount) }}
+                </span>
+              </div>
+              <div class="projection-scenario-detail__actions">
+                <button type="button" @click="openScenarioForEdit(selectedScenario)">
+                  <Pencil aria-hidden="true" /> Editar
+                </button>
+                <button
+                  type="button"
+                  :disabled="deletingScenarioId === selectedScenario.id"
+                  @click="requestScenarioDelete(selectedScenario)"
+                >
+                  <Trash2 aria-hidden="true" /> Excluir
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <div class="projection-card__chart">
           <UiSkeleton v-if="pending && !report" height="23rem" radius="md" />
           <ReportsProjectionChart
             v-else-if="report"
             :points="displayedPoints"
             :snapshots="displayedSnapshots"
+            :scenarios="displayedScenarios"
             :current-label="`Projeção atual · ${balanceModeLabel}`"
           />
         </div>
@@ -344,6 +524,34 @@ function formatDate(value: string) {
         </footer>
       </UiCard>
     </template>
+
+    <ReportsProjectionScenarioFormDrawer
+      v-if="minimumScenarioMonth"
+      v-model:open="scenarioDrawerOpen"
+      :scenario="editingScenario"
+      :minimum-month="minimumScenarioMonth"
+      @saved="scenarioSaved"
+    />
+
+    <UiConfirmDialog
+      v-model:open="scenarioDeleteDialogOpen"
+      title="Excluir cenário?"
+      :description="`O cenário “${pendingScenarioDelete?.name ?? ''}” será removido. Seus lançamentos e projeções reais não serão alterados.`"
+      confirm-label="Excluir cenário"
+      :busy="deletingScenarioId !== null"
+      @confirm="confirmScenarioDelete"
+      @cancel="pendingScenarioDelete = null"
+    />
+
+    <UiConfirmDialog
+      v-model:open="snapshotDeleteDialogOpen"
+      title="Excluir snapshot?"
+      :description="`O snapshot “${pendingSnapshotDelete?.label ?? ''}” deixará de aparecer nas comparações. A projeção atual não será alterada.`"
+      confirm-label="Excluir snapshot"
+      :busy="deletingId !== null"
+      @confirm="confirmSnapshotDelete"
+      @cancel="pendingSnapshotDelete = null"
+    />
   </div>
 </template>
 
@@ -549,6 +757,162 @@ function formatDate(value: string) {
   font-size: var(--text-xs);
 }
 
+.projection-scenarios {
+  display: flex;
+  min-height: 4.25rem;
+  padding: var(--space-3) var(--space-6);
+  align-items: flex-start;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-subtle);
+}
+
+.projection-scenarios__label {
+  display: flex;
+  min-height: 2.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.projection-scenarios__label svg,
+.projection-scenario-add svg,
+.projection-scenarios__empty svg,
+.projection-scenario-detail__actions svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.projection-scenarios__content {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.projection-scenarios__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.projection-scenario,
+.projection-scenario-add,
+.projection-scenarios__empty {
+  display: inline-flex;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.75rem;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-round);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.projection-scenario.is-active {
+  border-color: var(--color-brand-ink);
+  background: var(--color-brand-soft);
+}
+
+.projection-scenario__dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  flex-shrink: 0;
+  border-radius: var(--radius-round);
+  background: var(--color-ink-muted);
+}
+
+.projection-scenario.is-active .projection-scenario__dot {
+  background: var(--color-brand);
+}
+
+.projection-scenario strong,
+.projection-scenario-add,
+.projection-scenarios__empty {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.projection-scenario small {
+  color: var(--color-ink-muted);
+  font-size: 0.65rem;
+}
+
+.projection-scenario-add,
+.projection-scenarios__empty {
+  color: var(--color-brand-ink);
+}
+
+.projection-scenarios__empty {
+  width: fit-content;
+}
+
+.projection-scenario-detail {
+  display: grid;
+  padding: var(--space-3) var(--space-4);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.projection-scenario-detail__summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.projection-scenario-detail__summary span,
+.projection-scenario-detail__items span {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.projection-scenario-detail__summary strong {
+  color: var(--color-positive-ink);
+  font-size: var(--text-sm);
+}
+
+.projection-scenario-detail__summary strong.is-negative {
+  color: var(--color-negative-ink);
+}
+
+.projection-scenario-detail__items {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.projection-scenario-detail__actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.projection-scenario-detail__actions button {
+  display: inline-flex;
+  min-height: 2rem;
+  padding: 0 var(--space-2);
+  align-items: center;
+  gap: var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.projection-scenario-detail__actions button:hover:not(:disabled) {
+  color: var(--color-ink);
+}
+
 .projection-card__chart {
   padding: var(--space-5) var(--space-6) var(--space-3);
 }
@@ -566,7 +930,8 @@ function formatDate(value: string) {
   }
 
   .projection-card__header,
-  .projection-snapshots {
+  .projection-snapshots,
+  .projection-scenarios {
     flex-direction: column;
   }
 
@@ -578,11 +943,25 @@ function formatDate(value: string) {
   .projection-snapshots {
     gap: var(--space-2);
   }
+
+  .projection-scenarios {
+    gap: var(--space-2);
+  }
+
+  .projection-scenario-detail {
+    grid-template-columns: 1fr auto;
+  }
+
+  .projection-scenario-detail__items {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 }
 
 @media (max-width: 520px) {
   .projection-card__header,
   .projection-snapshots,
+  .projection-scenarios,
   .projection-card__chart {
     padding-right: var(--space-4);
     padding-left: var(--space-4);
@@ -591,6 +970,16 @@ function formatDate(value: string) {
   .projection-card__actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .projection-scenario-detail {
+    grid-template-columns: 1fr;
+  }
+
+  .projection-scenario-detail__items,
+  .projection-scenario-detail__actions {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .projection-card__footer {

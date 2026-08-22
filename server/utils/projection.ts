@@ -2,14 +2,16 @@ import type Database from 'better-sqlite3'
 import type {
   ProjectionPoint,
   ProjectionReport,
+  ProjectionScenarioItem,
   ProjectionSnapshot,
   ProjectionSnapshotKind,
 } from '~/types/projection'
-import { addMonthsLocal, roundMoney } from '~/utils/dateMoney'
+import { addMonthsLocal, roundMoney, splitAmount } from '~/utils/dateMoney'
 import {
   getProjectedBalancesAtDates,
   getSaldoBancarioTotal,
 } from './cashFlow'
+import { listStoredProjectionScenarios } from './projectionScenarios'
 
 const SNAPSHOT_HORIZON = 18
 const MONTH_LABELS = [
@@ -52,6 +54,7 @@ export function buildProjectionPoints(
   db: Database.Database,
   startMonth: string,
   horizonMonths = SNAPSHOT_HORIZON,
+  scenarioItems: ProjectionScenarioItem[] = [],
 ): ProjectionPoint[] {
   const months: string[] = []
   const datesByMonth = new Map<string, string[]>()
@@ -72,9 +75,20 @@ export function buildProjectionPoints(
   }
 
   const balances = getProjectedBalancesAtDates(db, allDates)
+  const scenarioEvents = buildScenarioEvents(
+    scenarioItems,
+    todayLocal(),
+    allDates.at(-1)!,
+  )
+  let scenarioAdjustment = 0
   return months.map((month) => {
     const dates = datesByMonth.get(month) ?? []
-    const dailyBalances = dates.map((date) => balances.get(date) ?? 0)
+    const dailyBalances = dates.map((date) => {
+      scenarioAdjustment = roundMoney(
+        scenarioAdjustment + (scenarioEvents.get(date) ?? 0),
+      )
+      return roundMoney((balances.get(date) ?? 0) + scenarioAdjustment)
+    })
     const closingBalance = dailyBalances.at(-1) ?? 0
 
     return {
@@ -85,6 +99,36 @@ export function buildProjectionPoints(
       worstBalance: roundMoney(Math.min(...dailyBalances)),
     }
   })
+}
+
+function buildScenarioEvents(
+  items: ProjectionScenarioItem[],
+  today: string,
+  lastDate: string,
+) {
+  const events = new Map<string, number>()
+  for (const item of items) {
+    const maximumOccurrences = item.durationMonths ?? 240
+    const amounts =
+      item.type === 'installment'
+        ? splitAmount(item.amount, maximumOccurrences)
+        : Array.from({ length: maximumOccurrences }, () => item.amount)
+    const direction =
+      item.type === 'expense' || item.type === 'installment' ? -1 : 1
+    let occurrenceDate = `${item.startMonth}-${String(item.day).padStart(2, '0')}`
+
+    for (const amount of amounts) {
+      if (occurrenceDate > lastDate) break
+      if (occurrenceDate > today) {
+        events.set(
+          occurrenceDate,
+          roundMoney((events.get(occurrenceDate) ?? 0) + direction * amount),
+        )
+      }
+      occurrenceDate = addMonthsLocal(occurrenceDate, 1)
+    }
+  }
+  return events
 }
 
 function parseSnapshot(row: SnapshotRow): ProjectionSnapshot | null {
@@ -183,11 +227,17 @@ export function buildProjectionReport(
 ): ProjectionReport {
   ensureMonthlyProjectionSnapshot(db)
   const today = todayLocal()
+  const startMonth = today.slice(0, 7)
+  const scenarios = listStoredProjectionScenarios(db).map((scenario) => ({
+    ...scenario,
+    points: buildProjectionPoints(db, startMonth, horizonMonths, scenario.items),
+  }))
   return {
     generatedAt: today,
     horizonMonths,
     currentBalance: getSaldoBancarioTotal(db, today),
-    points: buildProjectionPoints(db, today.slice(0, 7), horizonMonths),
+    points: buildProjectionPoints(db, startMonth, horizonMonths),
     snapshots: listProjectionSnapshots(db),
+    scenarios,
   }
 }

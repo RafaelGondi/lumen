@@ -12,7 +12,11 @@ import {
   type ChartOptions,
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
-import type { ProjectionPoint, ProjectionSnapshot } from '~/types/projection'
+import type {
+  ProjectionPoint,
+  ProjectionScenario,
+  ProjectionSnapshot,
+} from '~/types/projection'
 
 ChartJS.register(
   CategoryScale,
@@ -27,6 +31,7 @@ ChartJS.register(
 const props = defineProps<{
   points: ProjectionPoint[]
   snapshots: ProjectionSnapshot[]
+  scenarios: ProjectionScenario[]
   currentLabel?: string
 }>()
 
@@ -40,6 +45,7 @@ const tokens = ref({
 })
 
 const snapshotColors = ['#718cbf', '#b57a42', '#9b6da6']
+const scenarioColors = ['#b4672f', '#7a5ca7', '#2f7890']
 
 onMounted(() => {
   if (!wrapRef.value) return
@@ -75,6 +81,27 @@ const chartData = computed<ChartData<'line', (number | null)[], string>>(() => {
       tension: 0.25,
     }
   })
+  const scenarioDatasets = props.scenarios.map((scenario, index) => {
+    const values = new Map(scenario.points.map((point) => [point.month, point.balance]))
+    const color = scenarioColors[index % scenarioColors.length]!
+    return {
+      label: `Simulação · ${scenario.name}`,
+      data: months.map((month) => values.get(month) ?? null),
+      borderColor: color,
+      backgroundColor: color,
+      borderWidth: 3,
+      borderDash: [12, 6],
+      borderDashOffset: 0,
+      pointRadius: 4,
+      pointHoverRadius: 6.5,
+      pointStyle: 'rectRot' as const,
+      pointBackgroundColor: tokens.value.surface,
+      pointBorderColor: color,
+      pointBorderWidth: 2.25,
+      spanGaps: false,
+      tension: 0.25,
+    }
+  })
 
   return {
     labels: props.points.map((point) => point.label),
@@ -105,6 +132,7 @@ const chartData = computed<ChartData<'line', (number | null)[], string>>(() => {
         pointBorderWidth: 1.5,
         cubicInterpolationMode: 'monotone',
       },
+      ...scenarioDatasets,
       ...snapshotDatasets,
     ],
   }

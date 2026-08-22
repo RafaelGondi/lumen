@@ -430,7 +430,34 @@ function migrate(database: Database.Database) {
   migrateCardInvoicePayments(database)
   migrateSpendingLimits(database)
   migrateProjectionSnapshots(database)
+  migrateProjectionScenarios(database)
   migrateCategorizationRules(database)
+}
+
+function migrateProjectionScenarios(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS projection_scenarios (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS projection_scenario_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      scenario_id INTEGER NOT NULL
+        REFERENCES projection_scenarios(id) ON DELETE CASCADE,
+      change_type TEXT NOT NULL
+        CHECK (change_type IN ('income', 'expense', 'reduction', 'installment')),
+      amount REAL NOT NULL CHECK (amount > 0),
+      start_month TEXT NOT NULL,
+      day INTEGER NOT NULL DEFAULT 1 CHECK (day BETWEEN 1 AND 28),
+      duration_months INTEGER CHECK (duration_months IS NULL OR duration_months > 0)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_projection_scenario_items_scenario
+      ON projection_scenario_items (scenario_id, id);
+  `)
 }
 
 function migrateCategorizationRules(database: Database.Database) {
