@@ -59,6 +59,11 @@ export interface CardInvoiceProjectionMonth {
   amount: number
   /** Barra clara: ≤ 15% da média ou &lt; R$ 150 */
   residual?: boolean
+  /**
+   * Fatura já fechada, anterior ao mês de referência. Fica fora do total e do
+   * cálculo de residual — é histórico para contexto, não projeção.
+   */
+  past?: boolean
 }
 
 export interface CardsProjectionSummary {

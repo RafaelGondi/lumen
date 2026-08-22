@@ -169,10 +169,10 @@ async function removeCard(card: Card) {
         height="16rem"
         radius="md"
       />
-      <CardsInvoiceProjectionChart
+      <CardsConsolidatedProjectionChart
         v-else-if="projection"
         title="Projeção consolidada de faturas"
-        subtitle="Próximos 12 meses • todos os cartões • barras claras = residuais"
+        subtitle="Próximos 12 meses • todos os cartões • trecho tracejado = faturas já fechadas"
         :items="projection.months"
         :total="projection.total"
       />

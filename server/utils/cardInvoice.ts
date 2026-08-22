@@ -254,9 +254,15 @@ function residualFromLabel(months: CardInvoiceProjectionMonth[]) {
   return null
 }
 
+/** Janela projetada a partir do mês de referência (inclusive). */
+const PROJECTION_MONTHS = 12
+/** Faturas já fechadas mostradas antes dela, só como contexto. */
+const PROJECTION_PAST_MONTHS = 6
+
 /**
- * Projeção consolidada (todos os cartões) — próximos 12 meses a partir de hoje.
- * Não altera saldo de conta.
+ * Projeção consolidada (todos os cartões): os próximos 12 meses a partir de
+ * hoje, precedidos de 6 faturas já fechadas como contexto — essas ficam fora
+ * de `total` e da marcação de residual. Não altera saldo de conta.
  */
 export function buildConsolidatedCardsProjection(
   db: Database.Database,
@@ -309,8 +315,8 @@ export function buildConsolidatedCardsProjection(
     mapped.map((card) => card.id),
   )
 
-  const months = Array.from({ length: 12 }, (_, index) => {
-    const month = shiftMonth(fromMonth, index)
+  const monthAt = (offset: number) => {
+    const month = shiftMonth(fromMonth, offset)
     const amount = roundMoney(
       mapped.reduce((sum, card) => {
         const paidTotal = paidTotals.get(`${card.id}:${month}`)
@@ -329,15 +335,29 @@ export function buildConsolidatedCardsProjection(
       shortLabel: MONTH_SHORT[monthParts(month).month - 1]!,
       amount,
     }
-  })
+  }
 
-  const withResidual = markResidualMonths(months)
+  const projected = Array.from({ length: PROJECTION_MONTHS }, (_, index) =>
+    monthAt(index),
+  )
+  /**
+   * Histórico só para contexto no gráfico. Fica fora de `markResidualMonths`
+   * e do total de propósito: fatura passada já foi paga, somá-la ao "total
+   * projetado" inflaria a dívida futura, e a média usada para marcar residual
+   * mudaria conforme o histórico crescesse.
+   */
+  const past = Array.from({ length: PROJECTION_PAST_MONTHS }, (_, index) => ({
+    ...monthAt(index - PROJECTION_PAST_MONTHS),
+    past: true,
+  }))
+
+  const withResidual = markResidualMonths(projected)
   const lastProjected = [...withResidual]
     .reverse()
     .find((item) => item.amount > 0)
 
   return {
-    months: withResidual,
+    months: [...past, ...withResidual],
     total: roundMoney(
       withResidual.reduce((sum, item) => sum + item.amount, 0),
     ),
