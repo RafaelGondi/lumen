@@ -144,7 +144,9 @@ async function save() {
         <CategoriesCategoryIconChip :icon="icon" :color="color" />
         <div>
           <p>{{ name.trim() || 'Nome da categoria' }}</p>
-          <span>{{ categoryTypeLabels[type] }}</span>
+          <span class="category-form__preview-type">
+            {{ categoryTypeLabels[type] }}
+          </span>
         </div>
       </div>
 
@@ -243,7 +245,7 @@ async function save() {
   font-weight: var(--weight-medium);
 }
 
-.category-form__preview span {
+.category-form__preview-type {
   color: var(--color-ink-muted);
   font-size: var(--text-xs);
 }
