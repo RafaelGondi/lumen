@@ -13,7 +13,7 @@ const open = defineModel<boolean>('open', { required: true })
 
 const name = ref('')
 const color = ref(categoryColorPalette[0]!)
-const icon = ref(categoryIconNames[0]!)
+const icon = ref(DEFAULT_CATEGORY_ICON)
 const errorMessage = ref('')
 const saving = ref(false)
 
@@ -25,7 +25,7 @@ watch(open, (value) => {
   errorMessage.value = ''
   name.value = props.supercategory?.name ?? ''
   color.value = props.supercategory?.color ?? categoryColorPalette[0]!
-  icon.value = props.supercategory?.icon ?? categoryIconNames[0]!
+  icon.value = props.supercategory?.icon ?? DEFAULT_CATEGORY_ICON
 })
 
 async function save() {

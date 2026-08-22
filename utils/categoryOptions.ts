@@ -1,5 +1,6 @@
 import type { Component } from 'vue'
 import {
+  Amphora,
   Baby,
   Balloon,
   Banknote,
@@ -8,6 +9,7 @@ import {
   Bike,
   Blender,
   Book,
+  BookOpen,
   Brain,
   BrickWallShield,
   Briefcase,
@@ -17,6 +19,7 @@ import {
   Camera,
   Car,
   CarTaxiFront,
+  ChefHat,
   ChessKnight,
   CircleDollarSign,
   CircleParking,
@@ -24,6 +27,7 @@ import {
   Coins,
   CookingPot,
   CreditCard,
+  Crown,
   CupSoda,
   Dessert,
   Dices,
@@ -41,6 +45,7 @@ import {
   Gift,
   GraduationCap,
   Guitar,
+  Hamburger,
   HandHeart,
   HandHelping,
   HandMetal,
@@ -110,6 +115,7 @@ import {
 import type { CategoryType } from '~/types/category'
 
 export const categoryIconMap: Record<string, Component> = {
+  amphora: Amphora,
   baby: Baby,
   balloon: Balloon,
   banknote: Banknote,
@@ -118,6 +124,7 @@ export const categoryIconMap: Record<string, Component> = {
   bike: Bike,
   blender: Blender,
   book: Book,
+  'book-open': BookOpen,
   brain: Brain,
   'brick-wall-shield': BrickWallShield,
   briefcase: Briefcase,
@@ -127,6 +134,7 @@ export const categoryIconMap: Record<string, Component> = {
   camera: Camera,
   car: Car,
   'car-taxi-front': CarTaxiFront,
+  'chef-hat': ChefHat,
   'chess-knight': ChessKnight,
   'circle-dollar': CircleDollarSign,
   'circle-parking': CircleParking,
@@ -134,6 +142,7 @@ export const categoryIconMap: Record<string, Component> = {
   coins: Coins,
   'cooking-pot': CookingPot,
   'credit-card': CreditCard,
+  crown: Crown,
   'cup-soda': CupSoda,
   dessert: Dessert,
   dices: Dices,
@@ -151,6 +160,7 @@ export const categoryIconMap: Record<string, Component> = {
   gift: Gift,
   'graduation-cap': GraduationCap,
   guitar: Guitar,
+  hamburger: Hamburger,
   'hand-heart': HandHeart,
   'hand-helping': HandHelping,
   'hand-metal': HandMetal,
@@ -220,9 +230,181 @@ export const categoryIconMap: Record<string, Component> = {
 
 export const categoryIconNames = Object.keys(categoryIconMap)
 
+/**
+ * Ícone de uma categoria recém-criada. Explícito porque o antigo
+ * `categoryIconNames[0]` seguia a ordem alfabética do map — qualquer ícone novo
+ * no começo do alfabeto virava o padrão sem ninguém decidir isso.
+ */
+export const DEFAULT_CATEGORY_ICON = 'tag'
+
 export function categoryIcon(name: string): Component {
   return categoryIconMap[name] ?? Tag
 }
+
+/**
+ * Agrupamento temático do seletor. São 111 ícones: uma grade única vira uma
+ * parede indistinta, e achar algo depende de varrer tudo. Os grupos existem só
+ * para navegação — a categoria salva guarda apenas o nome do ícone, então
+ * mover um ícone de grupo não afeta dado nenhum.
+ */
+export const categoryIconGroups: { label: string; icons: string[] }[] = [
+  {
+    label: 'Alimentação',
+    icons: [
+      'utensils',
+      'chef-hat',
+      'cooking-pot',
+      'blender',
+      'pizza',
+      'hamburger',
+      'salad',
+      'wheat',
+      'dessert',
+      'ice-cream-bowl',
+      'popcorn',
+      'coffee',
+      'cup-soda',
+      'beer',
+      'wine',
+    ],
+  },
+  {
+    label: 'Casa',
+    icons: [
+      'house',
+      'refrigerator',
+      'washing-machine',
+      'brush-cleaning',
+      'soap-dispenser',
+      'bubbles',
+      'droplet',
+      'flame',
+      'zap',
+      'wifi',
+      'brick-wall-shield',
+      'sprout',
+    ],
+  },
+  {
+    label: 'Transporte',
+    icons: [
+      'car',
+      'car-taxi-front',
+      'bike',
+      'bus',
+      'tram-front',
+      'plane',
+      'ship',
+      'fuel',
+      'parking',
+      'circle-parking',
+      'luggage',
+    ],
+  },
+  {
+    label: 'Saúde',
+    icons: ['stethoscope', 'pill', 'heart', 'brain'],
+  },
+  {
+    label: 'Esporte e ar livre',
+    icons: [
+      'dumbbell',
+      'biceps-flexed',
+      'footprints',
+      'volleyball',
+      'mountain',
+      'tree-palm',
+      'waves-horizontal',
+      'ferris-wheel',
+      'balloon',
+    ],
+  },
+  {
+    label: 'Compras',
+    icons: [
+      'shopping-cart',
+      'shopping-bag',
+      'shirt',
+      'gift',
+      'credit-card',
+      'tag',
+      'tag-x',
+    ],
+  },
+  {
+    label: 'Dinheiro',
+    icons: [
+      'wallet',
+      'banknote',
+      'coins',
+      'circle-dollar',
+      'piggy-bank',
+      'landmark',
+      'receipt',
+      'trending-up',
+      'repeat',
+      'briefcase',
+      'handshake',
+    ],
+  },
+  {
+    label: 'Arte e cultura',
+    icons: [
+      'palette',
+      'paintbrush',
+      'amphora',
+      'camera',
+      'film',
+      'tv',
+      'theater',
+      'music',
+      'music-4',
+      'guitar',
+      'piano',
+      'drum',
+      'mic-vocal',
+      'hand-metal',
+      'gamepad',
+      'dices',
+      'chess-knight',
+      'puzzle',
+      'party',
+      'sparkles',
+      'crown',
+      'telescope',
+    ],
+  },
+  {
+    label: 'Trabalho e ferramentas',
+    icons: [
+      'laptop',
+      'mouse',
+      'presentation',
+      'speech',
+      'book',
+      'book-open',
+      'graduation-cap',
+      'wrench',
+      'drill',
+      'tool-case',
+    ],
+  },
+  {
+    label: 'Pessoas e pets',
+    icons: [
+      'baby',
+      'smile-plus',
+      'laugh',
+      'phone',
+      'hand-heart',
+      'hand-helping',
+      'hand-platter',
+      'scissors',
+      'dog',
+      'paw-print',
+    ],
+  },
+]
 
 /** A paleta de cor mora em utils/categoryPalette.ts — só cores do Akoma. */
 
