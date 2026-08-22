@@ -2,7 +2,7 @@
 import { Pencil, Trash2 } from '@lucide/vue'
 import type { Supercategory } from '~/types/category'
 
-defineProps<{
+const props = defineProps<{
   supercategory: Supercategory
 }>()
 
@@ -12,6 +12,18 @@ defineEmits<{
 }>()
 
 const VISIBLE_MEMBERS = 5
+
+const expanded = ref(false)
+
+const visibleMembers = computed(() =>
+  expanded.value
+    ? props.supercategory.categories
+    : props.supercategory.categories.slice(0, VISIBLE_MEMBERS),
+)
+
+const hiddenCount = computed(
+  () => props.supercategory.categories.length - VISIBLE_MEMBERS,
+)
 </script>
 
 <template>
@@ -51,10 +63,7 @@ const VISIBLE_MEMBERS = 5
     </div>
 
     <ul v-if="supercategory.categories.length" class="super-card__members">
-      <li
-        v-for="member in supercategory.categories.slice(0, VISIBLE_MEMBERS)"
-        :key="member.id"
-      >
+      <li v-for="member in visibleMembers" :key="member.id">
         <span
           class="super-card__member-dot"
           :style="{ background: member.color }"
@@ -62,11 +71,14 @@ const VISIBLE_MEMBERS = 5
         />
         {{ member.name }}
       </li>
-      <li
-        v-if="supercategory.categories.length > VISIBLE_MEMBERS"
-        class="super-card__member-more"
-      >
-        +{{ supercategory.categories.length - VISIBLE_MEMBERS }}
+      <li v-if="hiddenCount > 0" class="super-card__member-toggle">
+        <button
+          type="button"
+          :aria-expanded="expanded"
+          @click="expanded = !expanded"
+        >
+          {{ expanded ? 'ver menos' : `+${hiddenCount}` }}
+        </button>
       </li>
     </ul>
     <p v-else class="super-card__empty">Nenhuma categoria associada.</p>
@@ -183,8 +195,36 @@ const VISIBLE_MEMBERS = 5
   border-radius: 50%;
 }
 
-.super-card__member-more {
+/*
+ * O <li> vira só um wrapper: quem carrega o visual de chip é o <button>, para
+ * que a área clicável cubra o chip inteiro e não sobre uma borda morta em volta.
+ */
+.super-card__members li.super-card__member-toggle {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.super-card__member-toggle button {
+  display: inline-flex;
+  min-height: 1.5rem;
+  padding: 0 var(--space-2);
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-round);
+  background: var(--color-surface-subtle);
   color: var(--color-ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.super-card__member-toggle button:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-ink-secondary);
 }
 
 .super-card__empty {
