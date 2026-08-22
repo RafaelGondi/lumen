@@ -41,7 +41,11 @@ const tabs = computed(() => [
     label: 'Supercategorias',
     count: supercategories.value.length,
   },
-  { id: 'rules', label: 'Regras inteligentes', count: rules.value.length },
+  {
+    id: 'rules',
+    label: 'Regras inteligentes',
+    count: new Set(rules.value.map((rule) => rule.categoryId)).size,
+  },
 ])
 
 const typeFilterOptions: { value: TypeFilter; label: string }[] = [
@@ -87,6 +91,18 @@ const filteredRules = computed(() => {
     (rule) =>
       rule.pattern.toLowerCase().includes(term) ||
       rule.categoryName.toLowerCase().includes(term),
+  )
+})
+
+const groupedRules = computed(() => {
+  const groups = new Map<number, CategorizationRule[]>()
+  for (const rule of filteredRules.value) {
+    const group = groups.get(rule.categoryId) ?? []
+    group.push(rule)
+    groups.set(rule.categoryId, group)
+  }
+  return [...groups.values()].sort((a, b) =>
+    a[0].categoryName.localeCompare(b[0].categoryName, 'pt-BR'),
   )
 })
 
@@ -303,7 +319,7 @@ async function removeRule(rule: CategorizationRule) {
         <div>
           <strong>Categorize novos lançamentos sem esforço</strong>
           <p>
-            As regras analisam descrição e nome no extrato. Elas só agem quando
+            Reúna vários termos para uma mesma categoria. As regras só agem quando
             nenhuma categoria foi escolhida manualmente.
           </p>
         </div>
@@ -327,15 +343,15 @@ async function removeRule(rule: CategorizationRule) {
           <UiSkeleton v-for="index in 4" :key="index" height="5.25rem" radius="sm" />
         </div>
       </UiCard>
-      <UiCard v-else-if="filteredRules.length" padding="none">
+      <UiCard v-else-if="groupedRules.length" padding="none">
         <div class="rules-list">
-          <CategoriesCategorizationRuleCard
-            v-for="rule in filteredRules"
-            :key="rule.id"
-            :rule="rule"
-            @edit="openRuleDrawer(rule)"
-            @toggle="toggleRule(rule)"
-            @remove="removeRule(rule)"
+          <CategoriesCategorizationRuleGroup
+            v-for="group in groupedRules"
+            :key="group[0].categoryId"
+            :rules="group"
+            @edit="openRuleDrawer"
+            @toggle="toggleRule"
+            @remove="removeRule"
           />
         </div>
       </UiCard>

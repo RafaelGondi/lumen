@@ -32,6 +32,14 @@ export interface CategorizationRulePayload {
   active: boolean
 }
 
+export interface CategorizationRuleBatchPayload {
+  field: CategorizationRuleField
+  operator: CategorizationRuleOperator
+  patterns: string[]
+  categoryId: number
+  active: boolean
+}
+
 export interface CategorizationMatch {
   ruleId: number
   categoryId: number

@@ -3,6 +3,7 @@ import type {
   CategorizationMatch,
   CategorizationRuleField,
   CategorizationRuleOperator,
+  CategorizationRuleBatchPayload,
   CategorizationRulePayload,
 } from '~/types/categorizationRule'
 import type { CategoryType } from '~/types/category'
@@ -134,5 +135,50 @@ export function parseCategorizationRulePayload(
     pattern,
     categoryId,
     active: body.active !== false,
+  }
+}
+
+export function parseCategorizationRuleBatchPayload(
+  raw: unknown,
+): CategorizationRuleBatchPayload {
+  const body = (raw ?? {}) as Record<string, unknown>
+  const patterns = Array.isArray(body.patterns)
+    ? body.patterns
+        .filter((pattern): pattern is string => typeof pattern === 'string')
+        .map((pattern) => pattern.trim())
+        .filter(Boolean)
+    : typeof body.pattern === 'string'
+      ? [body.pattern.trim()].filter(Boolean)
+      : []
+
+  const uniquePatterns = [...new Map(
+    patterns.map((pattern) => [normalizeRuleText(pattern), pattern]),
+  ).values()]
+
+  if (uniquePatterns.length === 0 || uniquePatterns.length > 30) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Informe entre 1 e 30 condições.',
+    })
+  }
+
+  if (uniquePatterns.some((pattern) => pattern.length > 120)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Cada condição pode ter no máximo 120 caracteres.',
+    })
+  }
+
+  const first = parseCategorizationRulePayload({
+    ...body,
+    pattern: uniquePatterns[0],
+  })
+
+  return {
+    field: first.field,
+    operator: first.operator,
+    patterns: uniquePatterns,
+    categoryId: first.categoryId,
+    active: first.active,
   }
 }
