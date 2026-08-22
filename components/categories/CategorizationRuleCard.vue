@@ -26,7 +26,9 @@ const operatorLabels = {
       />
       <div>
         <strong>{{ rule.categoryName }}</strong>
-        <span>{{ categoryTypeLabels[rule.categoryType] }}</span>
+        <span class="rule-card__category-type">
+          {{ categoryTypeLabels[rule.categoryType] }}
+        </span>
       </div>
     </div>
 
@@ -74,7 +76,7 @@ const operatorLabels = {
 .rule-card__category { display: flex; min-width: 0; align-items: center; gap: var(--space-3); }
 .rule-card__category > div { display: flex; min-width: 0; flex-direction: column; gap: .1rem; }
 .rule-card__category strong { overflow: hidden; font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
-.rule-card__category span, .rule-card__condition span, .rule-card__usage small { color: var(--color-ink-muted); font-size: var(--text-xs); }
+.rule-card__category-type, .rule-card__condition span, .rule-card__usage small { color: var(--color-ink-muted); font-size: var(--text-xs); }
 .rule-card__condition { min-width: 0; }
 .rule-card__condition p { margin-top: .15rem; overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
 .rule-card__condition strong { color: var(--color-ink); font-weight: var(--weight-semibold); }
