@@ -17,6 +17,7 @@ import {
   Bubbles,
   Bus,
   Camera,
+  Candy,
   Car,
   CarTaxiFront,
   ChefHat,
@@ -25,6 +26,7 @@ import {
   CircleParking,
   Coffee,
   Coins,
+  Cookie,
   CookingPot,
   CreditCard,
   Crown,
@@ -132,6 +134,7 @@ export const categoryIconMap: Record<string, Component> = {
   bubbles: Bubbles,
   bus: Bus,
   camera: Camera,
+  candy: Candy,
   car: Car,
   'car-taxi-front': CarTaxiFront,
   'chef-hat': ChefHat,
@@ -140,6 +143,7 @@ export const categoryIconMap: Record<string, Component> = {
   'circle-parking': CircleParking,
   coffee: Coffee,
   coins: Coins,
+  cookie: Cookie,
   'cooking-pot': CookingPot,
   'credit-card': CreditCard,
   crown: Crown,
@@ -242,7 +246,7 @@ export function categoryIcon(name: string): Component {
 }
 
 /**
- * Agrupamento temático do seletor. São 111 ícones: uma grade única vira uma
+ * Agrupamento temático do seletor. São mais de cem ícones: uma grade única vira uma
  * parede indistinta, e achar algo depende de varrer tudo. Os grupos existem só
  * para navegação — a categoria salva guarda apenas o nome do ícone, então
  * mover um ícone de grupo não afeta dado nenhum.
@@ -260,6 +264,8 @@ export const categoryIconGroups: { label: string; icons: string[] }[] = [
       'salad',
       'wheat',
       'dessert',
+      'cookie',
+      'candy',
       'ice-cream-bowl',
       'popcorn',
       'coffee',
