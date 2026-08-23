@@ -69,6 +69,12 @@ const projectedCount = computed(
 )
 
 const viewportWidth = ref(0)
+/** Acompanha a rolagem para o tooltip saber onde o ponto está na área visível. */
+const scrollLeft = ref(0)
+
+function syncScroll() {
+  scrollLeft.value = scrollRef.value?.scrollLeft ?? 0
+}
 
 /**
  * O mês é dimensionado para que a janela projetada preencha exatamente a
@@ -89,6 +95,7 @@ function anchorToCurrentMonth() {
   const el = scrollRef.value
   if (!el) return
   el.scrollLeft = firstProjectedIndex.value * monthWidth.value
+  syncScroll()
 }
 
 let observer: ResizeObserver | null = null
@@ -260,8 +267,20 @@ const tooltip = ref<{
 const tooltipStyle = computed(() => {
   const t = tooltip.value
   if (!t) return undefined
-  const razao = t.width ? t.x / t.width : 0.5
-  const alinhamento = razao > 0.7 ? 'calc(-100% + 1rem)' : razao < 0.3 ? '-1rem' : '-50%'
+  /*
+   * A âncora precisa sair da posição VISÍVEL, não da posição no canvas: o
+   * canvas é bem mais largo que a viewport e quem corta é o container que
+   * rola. Medindo contra a largura do canvas, o primeiro ponto à vista dava
+   * "meio do gráfico" e era centralizado — metade do tooltip caía fora.
+   */
+  const visivelX = t.x - scrollLeft.value
+  const largura = viewportWidth.value || t.width || 1
+  const razao = visivelX / largura
+  /*
+   * Nos extremos o tooltip encosta no ponto, sem a folga de 1rem: no último
+   * mês essa folga jogava a borda 6px para fora do container.
+   */
+  const alinhamento = razao > 0.7 ? '-100%' : razao < 0.3 ? '0' : '-50%'
   const abaixo = t.y < 120
   return {
     left: `${t.x}px`,
@@ -376,7 +395,11 @@ function formatMonthKey(month: string) {
         </span>
       </div>
 
-      <div ref="scrollRef" class="projection-curve__scroll">
+      <div
+        ref="scrollRef"
+        class="projection-curve__scroll"
+        @scroll.passive="syncScroll"
+      >
         <div
           class="projection-curve__plot"
           :style="{ width: `${plotWidth}px` }"
