@@ -317,25 +317,36 @@ export function buildConsolidatedCardsProjection(
 
   const monthAt = (offset: number) => {
     const month = shiftMonth(fromMonth, offset)
-    const amount = roundMoney(
-      mapped.reduce((sum, card) => {
-        const paidTotal = paidTotals.get(`${card.id}:${month}`)
-        if (paidTotal !== undefined) return sum + paidTotal
-        const entriesSubtotal = invoiceEntries(db, card, month).reduce(
-          (entrySum, entry) => entrySum + entry.amount,
-          0,
-        )
-        const adjustment =
-          adjustments.get(`${card.id}:${month}`) ?? 0
-        return sum + entriesSubtotal + adjustment
-      }, 0),
-    )
+    let amount = 0
+    let paid = 0
+    /*
+     * Um mês pode ficar parcialmente pago: são vários cartões, cada um com sua
+     * data de fechamento e pagamento. Por isso o pago é somado por cartão, e
+     * não decidido para o mês inteiro.
+     */
+    for (const card of mapped) {
+      const paidTotal = paidTotals.get(`${card.id}:${month}`)
+      if (paidTotal !== undefined) {
+        amount += paidTotal
+        paid += paidTotal
+        continue
+      }
+      const entriesSubtotal = invoiceEntries(db, card, month).reduce(
+        (entrySum, entry) => entrySum + entry.amount,
+        0,
+      )
+      amount += entriesSubtotal + (adjustments.get(`${card.id}:${month}`) ?? 0)
+    }
     return {
       month,
       shortLabel: MONTH_SHORT[monthParts(month).month - 1]!,
-      amount,
+      amount: roundMoney(amount),
+      paidAmount: roundMoney(paid),
     }
   }
+
+  const openAmount = (item: { amount: number; paidAmount?: number }) =>
+    roundMoney(item.amount - (item.paidAmount ?? 0))
 
   const projected = Array.from({ length: PROJECTION_MONTHS }, (_, index) =>
     monthAt(index),
@@ -352,14 +363,20 @@ export function buildConsolidatedCardsProjection(
   }))
 
   const withResidual = markResidualMonths(projected)
+  /** Quitação é sobre o que falta pagar: fatura já quitada não adia nada. */
   const lastProjected = [...withResidual]
     .reverse()
-    .find((item) => item.amount > 0)
+    .find((item) => openAmount(item) > 0)
 
   return {
     months: [...past, ...withResidual],
+    /*
+     * Só o que falta pagar — mesma regra de `cardUsageSummary`, que alimenta o
+     * "Utilizado" no topo da página. Somar fatura já quitada faria o número
+     * deixar de ser dívida em aberto.
+     */
     total: roundMoney(
-      withResidual.reduce((sum, item) => sum + item.amount, 0),
+      withResidual.reduce((sum, item) => sum + openAmount(item), 0),
     ),
     estimatedPayoffLabel: lastProjected
       ? monthLabel(lastProjected.month)
@@ -481,11 +498,29 @@ export function cardUsageSummary(
     usedAmount: 0,
     estimatedPayoffLabel: null,
   }
-  const invoice = buildCardInvoice(db, withPlaceholder, fromMonth)
   const paidInvoices = loadCardInvoicePaymentsMap(db, card.id)
-  const openProjection = invoice.projection.filter(
-    (item) => item.month >= fromMonth && !paidInvoices.has(item.month),
+  const cardAdjustments = loadCardInvoiceAdjustmentsMap(db, card.id)
+  /*
+   * A janela é montada aqui, e não filtrando `buildCardInvoice().projection`:
+   * aquela começa um mês antes do foco, então o filtro `>= fromMonth` deixava
+   * só 11 meses e o "Utilizado" discordava do total da projeção consolidada
+   * pelo valor do 12º mês.
+   */
+  const openProjection = Array.from(
+    { length: PROJECTION_MONTHS },
+    (_, index) => shiftMonth(fromMonth, index),
   )
+    .filter((month) => !paidInvoices.has(month))
+    .map((month) => ({
+      month,
+      amount: invoiceMonthAmount(
+        db,
+        withPlaceholder,
+        month,
+        cardAdjustments,
+        paidInvoices,
+      ),
+    }))
   const usedAmount = roundMoney(
     openProjection.reduce((sum, item) => sum + item.amount, 0),
   )

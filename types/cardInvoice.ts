@@ -64,6 +64,12 @@ export interface CardInvoiceProjectionMonth {
    * cálculo de residual — é histórico para contexto, não projeção.
    */
   past?: boolean
+  /**
+   * Parte de `amount` já quitada (faturas com pagamento registrado). Um mês
+   * pode ser parcialmente pago: são vários cartões, e cada um fecha e é pago
+   * na sua própria data.
+   */
+  paidAmount?: number
 }
 
 export interface CardsProjectionSummary {

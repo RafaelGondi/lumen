@@ -64,6 +64,23 @@ const firstProjectedIndex = computed(() => {
 
 const hasPast = computed(() => props.items.some((item) => item.past))
 
+function openAmountOf(item: CardInvoiceProjectionMonth) {
+  return Math.max(0, item.amount - (item.paidAmount ?? 0))
+}
+
+/**
+ * Quitado: mês com fatura e nada em aberto. É isso, e não `past`, que define o
+ * traço esmaecido — o mês corrente pode já estar pago, e um mês do histórico
+ * pode ter ficado em aberto.
+ */
+function isSettled(item: CardInvoiceProjectionMonth) {
+  return item.amount > 0 && openAmountOf(item) < 0.005
+}
+
+function isPartlyPaid(item: CardInvoiceProjectionMonth) {
+  return (item.paidAmount ?? 0) > 0 && !isSettled(item)
+}
+
 const projectedCount = computed(
   () => props.items.length - firstProjectedIndex.value,
 )
@@ -165,12 +182,17 @@ const pointRadius = computed(() =>
 )
 
 const pointColor = computed(() =>
+  props.items.map((item) => {
+    if (isSettled(item)) return mutedLine(35)
+    if (isPartlyPaid(item)) return tokens.value.surface
+    return item.residual ? mutedLine(45) : tokens.value.line
+  }),
+)
+
+/** Mês parcialmente pago ganha ponto vazado: nem quitado, nem totalmente aberto. */
+const pointBorderColor = computed(() =>
   props.items.map((item) =>
-    item.past
-      ? mutedLine(35)
-      : item.residual
-        ? mutedLine(45)
-        : tokens.value.line,
+    isPartlyPaid(item) ? tokens.value.line : tokens.value.surface,
   ),
 )
 
@@ -183,16 +205,21 @@ const chartData = computed(() => ({
       borderColor: tokens.value.line,
       borderWidth: 2,
       /**
-       * Histórico em traço fino e esmaecido: separa visualmente o que já
-       * aconteceu do que é estimativa, sem precisar de uma segunda série.
+       * Tracejado e esmaecido = já quitado. O critério é a fatura estar paga,
+       * não o mês ser passado: assim o trecho sólido é exatamente a dívida que
+       * ainda existe, que é o número do cabeçalho.
        */
       segment: {
-        borderColor: (ctx: ScriptableLineSegmentContext) =>
-          props.items[ctx.p1DataIndex]?.past
+        borderColor: (ctx: ScriptableLineSegmentContext) => {
+          const item = props.items[ctx.p1DataIndex]
+          return item && (item.past || isSettled(item))
             ? mutedLine(38)
-            : tokens.value.line,
-        borderDash: (ctx: ScriptableLineSegmentContext) =>
-          props.items[ctx.p1DataIndex]?.past ? [4, 3] : undefined,
+            : tokens.value.line
+        },
+        borderDash: (ctx: ScriptableLineSegmentContext) => {
+          const item = props.items[ctx.p1DataIndex]
+          return item && (item.past || isSettled(item)) ? [4, 3] : undefined
+        },
       },
       backgroundColor: (ctx: { chart: Chart }) => {
         const { ctx: c, chartArea } = ctx.chart
@@ -207,7 +234,7 @@ const chartData = computed(() => ({
       pointRadius: pointRadius.value,
       pointHoverRadius: 6,
       pointBackgroundColor: pointColor.value,
-      pointBorderColor: tokens.value.surface,
+      pointBorderColor: pointBorderColor.value,
       pointBorderWidth: 1.5,
     },
   ],
@@ -378,8 +405,12 @@ function formatMonthKey(month: string) {
         <h2>{{ title }}</h2>
         <p>{{ subtitle }}</p>
       </div>
+      <!--
+        "Em aberto", não "Total": o valor exclui faturas já quitadas, então
+        chamá-lo de total sugeriria que soma tudo que aparece na curva.
+      -->
       <strong>
-        Total:
+        Em aberto:
         <UiMoney :value="total" />
       </strong>
     </div>
@@ -422,12 +453,18 @@ function formatMonthKey(month: string) {
           >
             <p>
               {{ formatMonthKey(tooltip.item.month) }}
-              <span v-if="tooltip.item.past">· fechada</span>
+              <span v-if="isSettled(tooltip.item)">· quitada</span>
+              <span v-else-if="tooltip.item.past">· fechada</span>
             </p>
             <div>
               {{ formatMoney(tooltip.item.amount) }}
               <em v-if="tooltip.item.residual">residual</em>
             </div>
+            <!-- Só quando há divisão: repetir "pago 0" em todo mês futuro é ruído. -->
+            <ul v-if="isPartlyPaid(tooltip.item)" class="projection-curve__split">
+              <li>Pago {{ formatMoney(tooltip.item.paidAmount ?? 0) }}</li>
+              <li>Em aberto {{ formatMoney(openAmountOf(tooltip.item)) }}</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -533,6 +570,16 @@ function formatMonthKey(month: string) {
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
+}
+
+.projection-curve__split {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid rgb(255 255 255 / 18%);
+  color: rgb(255 255 255 / 72%);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  list-style: none;
 }
 
 .projection-curve__tooltip em {
