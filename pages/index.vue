@@ -46,12 +46,6 @@ const {
     <section class="overview" aria-labelledby="overview-title">
       <AkSectionHeader class="overview__heading">
         <span id="overview-title">Resumo financeiro</span>
-        <template #action>
-          <p class="overview__updated">
-            <span aria-hidden="true" />
-            Atualizado: {{ selectedMonth?.updatedAt ?? '—' }}
-          </p>
-        </template>
       </AkSectionHeader>
 
       <DashboardSkeleton v-if="isLoading || !selectedMonth" />
@@ -117,21 +111,6 @@ const {
   margin-bottom: var(--space-4);
 }
 
-.overview__updated {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-ink-muted);
-  font-size: var(--text-2xs);
-}
-
-.overview__updated span {
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 50%;
-  background: var(--color-positive);
-}
-
 .dashboard-content {
   animation: content-in var(--transition-base) both;
 }
@@ -156,6 +135,16 @@ const {
     align-items: flex-start;
     flex-direction: column;
     gap: var(--space-2);
+  }
+}
+
+@media (max-width: 768px) {
+  .overview {
+    margin-top: var(--space-4);
+  }
+
+  .overview__heading {
+    margin-bottom: var(--space-3);
   }
 }
 </style>

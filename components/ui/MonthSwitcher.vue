@@ -405,7 +405,7 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .month-switcher {
     width: 100%;
     grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem minmax(3rem, auto);

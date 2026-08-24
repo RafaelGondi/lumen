@@ -60,11 +60,13 @@ defineProps<{
   }
 
   .page-heading__actions {
+    width: 100%;
     justify-content: stretch;
   }
 
   .page-heading__actions > :deep(*) {
     flex: 1 1 auto;
+    min-width: 0;
   }
 }
 </style>

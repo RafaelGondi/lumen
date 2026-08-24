@@ -143,6 +143,13 @@ function loadActiveCards(db: ReturnType<typeof useDb>): Card[] {
   }))
 }
 
+function invoicePaymentEntryIds(db: ReturnType<typeof useDb>) {
+  const rows = db
+    .prepare('SELECT entry_id AS entryId FROM card_invoice_payments')
+    .all() as { entryId: number }[]
+  return new Set(rows.map((row) => row.entryId))
+}
+
 function sortOldestFirst(items: FinanceListItem[]) {
   return [...items].sort(
     (a, b) =>
@@ -239,6 +246,7 @@ export function buildDashboardMonth(monthKey: string): DashboardMonth {
     prevEnd <= today ? totalBalancesAt(prevEnd) : cashFlow.openingBalance
 
   const monthEntries = occurrencesForCashMonth(db, monthKey)
+  const paymentEntryIds = invoicePaymentEntryIds(db)
 
   const invoiceItems: FinanceListItem[] = []
   for (const card of loadActiveCards(db)) {
@@ -366,7 +374,10 @@ export function buildDashboardMonth(monthKey: string): DashboardMonth {
   }
 
   const expenseItems: FinanceListItem[] = monthEntries
-    .filter((entry) => entry.type === 'expense')
+    .filter(
+      (entry) =>
+        entry.type === 'expense' && !paymentEntryIds.has(entry.parentId),
+    )
     .map((entry) => ({
       id: `pay-${entry.occurrenceKey}`,
       name: entry.description,
