@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * Delega ao AkPageHeader — a anatomia de page chrome do Akoma
- * (label → title → meta → actions) já era a deste componente.
+ * `eyebrow` permanece no contrato para compatibilidade com as páginas, mas o
+ * caminho redundante não é exibido no cabeçalho.
  */
 defineProps<{
   eyebrow: string
@@ -13,7 +13,6 @@ defineProps<{
 <template>
   <AkPageHeader
     class="page-heading"
-    :label="eyebrow"
     :title="title"
     :meta="description"
     variant="flush"
