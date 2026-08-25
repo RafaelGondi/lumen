@@ -687,8 +687,8 @@ export function buildLimitBreakdown(
     )
     .sort(
       (a, b) =>
-        b.amount - a.amount ||
         b.date.localeCompare(a.date) ||
+        b.amount - a.amount ||
         a.description.localeCompare(b.description, 'pt-BR'),
     )
 
