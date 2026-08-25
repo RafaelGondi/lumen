@@ -80,6 +80,7 @@ onBeforeUnmount(() => {
         </nav>
 
         <div class="topbar__actions">
+          <ToolsFloatingCalculator />
           <SearchGlobalSearch />
         </div>
       </div>
