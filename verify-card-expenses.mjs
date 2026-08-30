@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3'
 
-const base = 'http://127.0.0.1:3003'
+const base = process.env.LUMEN_CARD_TEST_BASE_URL ?? 'http://127.0.0.1:3003'
 
 async function api(path, options = {}) {
   const response = await fetch(base + path, {
@@ -68,9 +68,9 @@ try {
 
   const jul09 = await create('Compra 09/07', 10, '2026-07-09')
   const jul26 = await create('Compra 26/07', 20, '2026-07-26')
-  await create('Limite inicial 26/06', 30, '2026-06-26')
-  await create('Limite final 25/07', 40, '2026-07-25')
-  await create('Fora da janela 26/07', 50, '2026-07-26')
+  await create('Limite inicial 25/06', 30, '2026-06-25')
+  await create('Limite final 24/07', 40, '2026-07-24')
+  await create('Fora da janela 25/07', 50, '2026-07-25')
   await create('Parcelada 3x', 100, '2026-07-09', 'installment', 3)
 
   const july = await api(`/api/cards/${cardId}/invoice?month=2026-07`)
@@ -96,21 +96,21 @@ try {
   )
   assert(
     august.entries.every(
-      (entry) => entry.date >= '2026-06-26' && entry.date <= '2026-07-25',
+      (entry) => entry.date >= '2026-06-25' && entry.date <= '2026-07-24',
     ),
     'Agosto contém item fora da janela',
   )
   assert(
     august.entries.some(
-      (entry) => entry.description === 'Limite inicial 26/06',
+      (entry) => entry.description === 'Limite inicial 25/06',
     ) &&
       august.entries.some(
-        (entry) => entry.description === 'Limite final 25/07',
+        (entry) => entry.description === 'Limite final 24/07',
       ) &&
       !august.entries.some(
-        (entry) => entry.description === 'Fora da janela 26/07',
+        (entry) => entry.description === 'Fora da janela 25/07',
       ),
-    'Janela 26/06..25/07 incorreta',
+    'Janela 25/06..24/07 incorreta',
   )
   assert(
     august.entries.some(
@@ -205,4 +205,3 @@ try {
     await api(`/api/cards/${cardId}`, { method: 'DELETE' }).catch(() => {})
   }
 }
-

@@ -59,7 +59,7 @@ O script faz build, envia `.output`, troca o bundle em `/app`, reinstala `better
 - `server/api/reports/cash-flow`: série diária de saldo bancário + projeção (faturas no vencimento).
 - `GET /api/cards/projection`: projeção consolidada de faturas (12 meses, todos os cartões).
 - `utils/bankCatalog.ts`: bancos pré-cadastrados e cores.
-- Cartões: `closing_day` = dia de **fechamento** da fatura (não início de ciclo); `due_day` = vencimento do boleto. Despesas de cartão ficam em `entries` com `card_id` preenchido e `account_id` NULL.
+- Cartões: `closing_day` = dia da **virada** da fatura; compras feitas nesse próprio dia já entram no novo ciclo. `due_day` = vencimento do boleto. Despesas de cartão ficam em `entries` com `card_id` preenchido e `account_id` NULL.
 - Detalhe do cartão: `GET /api/cards/:id/invoice?month=YYYY-MM` agrupa lançamentos pela janela de fechamento (`utils/cardInvoiceCycle.ts`). CRUD em `POST/PUT/DELETE /api/cards/:id/expenses`. Pagamento de fatura (debitar conta) fica para a fase seguinte.
 - Fluxo de caixa: dias ≤ hoje usam saldo bancário real; dias > hoje partem do saldo de hoje e acumulam ocorrências de conta + faturas abertas no vencimento. Despesas de cartão na data da compra não entram no caixa.
 - `server/utils/categorySeedData.ts`: seed das supercategorias e categorias da aplicação antiga. Em banco vazio o seed roda automaticamente; para reaplicar: `POST /api/dev/seed-categories`.

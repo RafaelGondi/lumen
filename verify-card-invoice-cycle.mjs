@@ -43,15 +43,15 @@ function faturaDateRange(year, month, cutoff) {
   const previous = monthParts(previousMonth.slice(0, 7))
   const before = monthParts(twoMonthsBefore.slice(0, 7))
   return {
-    startDate: addDays(closingDate(before.year, before.month, cutoff), 1),
-    endDate: closingDate(previous.year, previous.month, cutoff),
+    startDate: closingDate(before.year, before.month, cutoff),
+    endDate: addDays(closingDate(previous.year, previous.month, cutoff), -1),
   }
 }
 
 function transacaoFaturaMonth(date, cutoff) {
   const [year, month, day] = date.split('-').map(Number)
   const effectiveCutoff = Math.min(cutoff, new Date(year, month, 0).getDate())
-  const offset = day <= effectiveCutoff ? 1 : 2
+  const offset = day < effectiveCutoff ? 1 : 2
   return addMonthsLocal(date, offset).slice(0, 7)
 }
 
@@ -64,19 +64,45 @@ function assert(condition, message) {
 }
 
 const range = faturaDateRange(2026, 8, 25)
-assert(range.startDate === '2026-06-26', `startDate: ${range.startDate}`)
-assert(range.endDate === '2026-07-25', `endDate: ${range.endDate}`)
+assert(range.startDate === '2026-06-25', `startDate: ${range.startDate}`)
+assert(range.endDate === '2026-07-24', `endDate: ${range.endDate}`)
 assert(
   transacaoFaturaMonth('2026-07-09', 25) === '2026-08',
   '09/07 deveria ir para 2026-08',
 )
 assert(
-  transacaoFaturaMonth('2026-07-26', 25) === '2026-09',
-  '26/07 deveria ir para 2026-09',
+  transacaoFaturaMonth('2026-07-24', 25) === '2026-08',
+  '24/07 deveria ir para 2026-08',
+)
+assert(
+  transacaoFaturaMonth('2026-07-25', 25) === '2026-09',
+  '25/07 deveria ir para 2026-09',
+)
+assert(
+  transacaoFaturaMonth('2026-08-25', 25) === '2026-10',
+  '25/08 deveria ir para 2026-10',
 )
 assert(
   calcFaturaMonth('2026-07-09', 25) === '2026-08',
   'calcFaturaMonth divergiu',
+)
+
+const firstDayRange = faturaDateRange(2026, 8, 1)
+assert(
+  firstDayRange.startDate === '2026-06-01' &&
+    firstDayRange.endDate === '2026-06-30',
+  `Janela com corte no dia 1 incorreta: ${JSON.stringify(firstDayRange)}`,
+)
+assert(
+  transacaoFaturaMonth('2026-07-01', 1) === '2026-09',
+  '01/07 com corte no dia 1 deveria ir para 2026-09',
+)
+
+const longCutoffRange = faturaDateRange(2026, 4, 31)
+assert(
+  longCutoffRange.startDate === '2026-02-28' &&
+    longCutoffRange.endDate === '2026-03-30',
+  `Janela com corte 31 em fevereiro incorreta: ${JSON.stringify(longCutoffRange)}`,
 )
 
 console.log(
@@ -84,7 +110,9 @@ console.log(
     {
       faturaDateRange: range,
       jul09: transacaoFaturaMonth('2026-07-09', 25),
-      jul26: transacaoFaturaMonth('2026-07-26', 25),
+      jul24: transacaoFaturaMonth('2026-07-24', 25),
+      jul25: transacaoFaturaMonth('2026-07-25', 25),
+      aug25: transacaoFaturaMonth('2026-08-25', 25),
     },
     null,
     2,

@@ -65,7 +65,7 @@ export function parseCardPayload(body: unknown): CardPayload {
   }
 
   /**
-   * closingDay = dia de FECHAMENTO da fatura (não início de ciclo).
+   * closingDay = dia da virada; compras nesse dia já entram no novo ciclo.
    * dueDay = dia de VENCIMENTO do boleto.
    */
   const closingDay = parseDay(raw.closingDay, 'Dia de fechamento')

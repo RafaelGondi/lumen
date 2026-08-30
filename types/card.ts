@@ -4,10 +4,9 @@ import type { BankKey } from '~/types/account'
  * Credit card (cartão).
  *
  * Semântica importante de ciclo de fatura:
- * - `closingDay` = dia de FECHAMENTO da fatura (não “melhor dia para comprar”
- *   no sentido de início de ciclo). Campo legado/UI às vezes chamado
- *   “melhor data p/ compra”, mas a regra de negócio é: compras até esse dia
- *   entram na fatura que fecha nessa data. Ver `utils/cardInvoiceCycle.ts`.
+ * - `closingDay` = dia da virada da fatura. Uma compra feita nesse próprio
+ *   dia já pertence ao novo ciclo (é também a melhor data para comprar).
+ *   Ver `utils/cardInvoiceCycle.ts`.
  * - `dueDay` = dia de VENCIMENTO do boleto.
  */
 export interface Card {
@@ -19,7 +18,7 @@ export interface Card {
   /** Últimos 4 dígitos do cartão (opcional). */
   lastFour: string | null
   creditLimit: number
-  /** Dia de FECHAMENTO da fatura (1–31). */
+  /** Dia da virada da fatura; o próprio dia já abre o novo ciclo (1–31). */
   closingDay: number
   /** Dia de VENCIMENTO do boleto (1–31). */
   dueDay: number
@@ -41,7 +40,7 @@ export interface CardPayload {
   color: string
   lastFour: string | null
   creditLimit: number
-  /** Dia de FECHAMENTO da fatura (1–31). */
+  /** Dia da virada da fatura; o próprio dia já abre o novo ciclo (1–31). */
   closingDay: number
   /** Dia de VENCIMENTO do boleto (1–31). */
   dueDay: number

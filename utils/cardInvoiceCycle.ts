@@ -27,7 +27,8 @@ function addDays(date: string, days: number) {
 /**
  * Janela de compras da fatura de competência `year-month`.
  *
- * Ex.: fatura 2026-08, fechamento 25 → 2026-06-26..2026-07-25.
+ * Ex.: fatura 2026-08, início do novo ciclo no dia 25
+ * → 2026-06-25..2026-07-24.
  * Estas funções agrupam a fatura aberta para exibição. Elas nunca devem
  * alterar saldo bancário nem recalcular o débito histórico de fatura paga.
  */
@@ -39,21 +40,21 @@ export function faturaDateRange(year: number, month: number, cutoff: number) {
   const before = monthParts(twoMonthsBefore.slice(0, 7))
 
   return {
-    startDate: addDays(closingDate(before.year, before.month, cutoff), 1),
-    endDate: closingDate(previous.year, previous.month, cutoff),
+    startDate: closingDate(before.year, before.month, cutoff),
+    endDate: addDays(closingDate(previous.year, previous.month, cutoff), -1),
   }
 }
 
 /**
  * Define a competência da fatura para uma data efetiva de compra.
  *
- * Compra até o fechamento no mês M → fatura M+1.
- * Compra após o fechamento no mês M → fatura M+2.
+ * Compra antes do corte no mês M → fatura M+1.
+ * Compra no dia do corte ou depois no mês M → fatura M+2.
  */
 export function transacaoFaturaMonth(date: string, cutoff: number) {
   const [year, month, day] = date.split('-').map(Number)
   const effectiveCutoff = Math.min(cutoff, new Date(year!, month!, 0).getDate())
-  const offset = day! <= effectiveCutoff ? 1 : 2
+  const offset = day! < effectiveCutoff ? 1 : 2
   return addMonthsLocal(date, offset).slice(0, 7)
 }
 
@@ -61,4 +62,3 @@ export function transacaoFaturaMonth(date: string, cutoff: number) {
 export function calcFaturaMonth(occurrenceDate: string, cutoff: number) {
   return transacaoFaturaMonth(occurrenceDate, cutoff)
 }
-

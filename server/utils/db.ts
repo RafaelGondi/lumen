@@ -323,7 +323,7 @@ function migrate(database: Database.Database) {
     );
 
     -- Cartões de crédito (sem compras/fatura nesta fase).
-    -- closing_day = dia de FECHAMENTO da fatura (não “melhor dia p/ comprar”).
+    -- closing_day = dia da virada; o próprio dia já abre o novo ciclo.
     -- due_day = dia de VENCIMENTO do boleto.
     CREATE TABLE IF NOT EXISTS cards (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

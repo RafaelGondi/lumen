@@ -357,7 +357,7 @@ async function save() {
             </option>
           </select>
           <p class="card-form__hint">
-            Dia de fechamento da fatura (não início de ciclo).
+            Compras feitas nesse dia já entram na próxima fatura.
           </p>
         </div>
         <div class="card-form__section">
