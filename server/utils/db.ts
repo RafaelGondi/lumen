@@ -430,6 +430,7 @@ function migrate(database: Database.Database) {
   migrateCardInvoicePayments(database)
   migrateSpendingLimits(database)
   migrateProjectionSnapshots(database)
+  migrateCashFlowSnapshots(database)
   migrateProjectionScenarios(database)
   migrateCategorizationRules(database)
 }
@@ -500,6 +501,21 @@ function migrateProjectionSnapshots(database: Database.Database) {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_projection_snapshots_auto_month
       ON projection_snapshots (snapshot_month)
       WHERE kind = 'auto';
+  `)
+}
+
+function migrateCashFlowSnapshots(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS cash_flow_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      snapshot_month TEXT NOT NULL UNIQUE,
+      kind TEXT NOT NULL CHECK (kind IN ('scheduled', 'recovery')),
+      points_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_cash_flow_snapshots_month
+      ON cash_flow_snapshots (snapshot_month DESC);
   `)
 }
 

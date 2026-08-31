@@ -6,6 +6,9 @@ import type {
   CashFlowMonthKind,
   CashFlowMovement,
   CashFlowReport,
+  CashFlowSnapshot,
+  CashFlowSnapshotKind,
+  CashFlowSnapshotPoint,
 } from '~/types/cashFlow'
 import type { EntryOccurrence } from '~/types/entry'
 import { addMonthsLocal, roundMoney } from '~/utils/dateMoney'
@@ -41,6 +44,14 @@ type CardRow = {
   closingDay: number
   dueDay: number
   active: number
+  createdAt: string
+}
+
+type CashFlowSnapshotRow = {
+  id: number
+  snapshotMonth: string
+  kind: CashFlowSnapshotKind
+  pointsJson: string
   createdAt: string
 }
 
@@ -325,6 +336,58 @@ function monthKindFor(monthKey: string, today: string): CashFlowMonthKind {
   return 'current'
 }
 
+function parseCashFlowSnapshot(
+  row: CashFlowSnapshotRow | undefined,
+): CashFlowSnapshot | null {
+  if (!row) return null
+  try {
+    const points = JSON.parse(row.pointsJson) as CashFlowSnapshotPoint[]
+    if (
+      !Array.isArray(points) ||
+      points.some(
+        (point) =>
+          !/^\d{4}-\d{2}-\d{2}$/.test(point.date) ||
+          !Number.isFinite(point.balance),
+      )
+    ) {
+      return null
+    }
+    return {
+      id: row.id,
+      snapshotMonth: row.snapshotMonth,
+      kind: row.kind,
+      createdAt: row.createdAt,
+      points,
+    }
+  } catch {
+    return null
+  }
+}
+
+export function getCashFlowSnapshot(
+  db: Database.Database,
+  month: string,
+): CashFlowSnapshot | null {
+  const row = db
+    .prepare(
+      `SELECT
+         id,
+         snapshot_month AS snapshotMonth,
+         kind,
+         points_json AS pointsJson,
+         created_at AS createdAt
+       FROM cash_flow_snapshots
+       WHERE snapshot_month = ?`,
+    )
+    .get(month) as CashFlowSnapshotRow | undefined
+  return parseCashFlowSnapshot(row)
+}
+
+function localDateTime(date = new Date()) {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
 export function buildCashFlowReport(
   db: Database.Database,
   monthKey: string,
@@ -408,5 +471,55 @@ export function buildCashFlowReport(
     closingBalance: roundMoney(closingBalance),
     closingDelta,
     days,
+    snapshot: getCashFlowSnapshot(db, monthKey),
+  }
+}
+
+export function createCashFlowSnapshot(
+  db: Database.Database,
+  kind: CashFlowSnapshotKind,
+  date = todayLocal(),
+  createdAt = localDateTime(),
+): CashFlowSnapshot {
+  const month = date.slice(0, 7)
+  const report = buildCashFlowReport(db, month)
+  const points = report.days.map(({ date: pointDate, balance }) => ({
+    date: pointDate,
+    balance,
+  }))
+  const result = db
+    .prepare(
+      `INSERT INTO cash_flow_snapshots (
+         snapshot_month, kind, points_json, created_at
+       ) VALUES (?, ?, ?, ?)`,
+    )
+    .run(month, kind, JSON.stringify(points), createdAt)
+
+  return {
+    id: Number(result.lastInsertRowid),
+    snapshotMonth: month,
+    kind,
+    createdAt,
+    points,
+  }
+}
+
+export function ensureMonthlyCashFlowSnapshot(
+  db: Database.Database,
+  kind: CashFlowSnapshotKind,
+  date = todayLocal(),
+  createdAt?: string,
+): CashFlowSnapshot {
+  const month = date.slice(0, 7)
+  const existing = getCashFlowSnapshot(db, month)
+  if (existing) return existing
+
+  try {
+    return createCashFlowSnapshot(db, kind, date, createdAt)
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) throw error
+    const concurrent = getCashFlowSnapshot(db, month)
+    if (!concurrent) throw error
+    return concurrent
   }
 }

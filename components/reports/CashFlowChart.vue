@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Eye, EyeOff } from '@lucide/vue'
 import {
   CategoryScale,
   Chart as ChartJS,
@@ -8,17 +9,19 @@ import {
   PointElement,
   Tooltip,
   type Chart,
+  type ChartData,
   type ChartOptions,
   type Plugin,
   type ScriptableLineSegmentContext,
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
-import type { CashFlowDay } from '~/types/cashFlow'
+import type { CashFlowDay, CashFlowSnapshot } from '~/types/cashFlow'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip)
 
 const props = defineProps<{
   days: CashFlowDay[]
+  snapshot: CashFlowSnapshot | null
   selectedDate: string | null
   criticalThreshold?: number
 }>()
@@ -28,7 +31,12 @@ const emit = defineEmits<{
 }>()
 
 const CRITICAL_FALLBACK = 500
+const SNAPSHOT_VISIBILITY_KEY = 'lumen:cash-flow:snapshot-visible:v2'
 const threshold = computed(() => props.criticalThreshold ?? CRITICAL_FALLBACK)
+const showSnapshot = ref(false)
+const visibleSnapshot = computed(() =>
+  showSnapshot.value ? props.snapshot : null,
+)
 
 /**
  * Cores saem dos tokens do Akoma, mas o Chart.js desenha em canvas e só
@@ -47,6 +55,7 @@ const CRITICAL_COLOR = AKOMA_PALETTE_FAMILIES.clay[2]
 const wrapRef = ref<HTMLElement | null>(null)
 const tokens = ref({
   line: '#5184b1',
+  snapshot: '#7c8780',
   critical: CRITICAL_COLOR,
   ink: '#213129',
   muted: '#67736b',
@@ -55,12 +64,16 @@ const tokens = ref({
 })
 
 onMounted(() => {
+  const savedVisibility = sessionStorage.getItem(SNAPSHOT_VISIBILITY_KEY)
+  if (savedVisibility !== null) showSnapshot.value = savedVisibility === 'true'
+
   const el = wrapRef.value
   if (!el) return
   const cs = getComputedStyle(el)
   const read = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback
   tokens.value = {
     line: read('--cash-flow-line', tokens.value.line),
+    snapshot: read('--color-ink-muted', tokens.value.snapshot),
     critical: CRITICAL_COLOR,
     ink: read('--color-ink', tokens.value.ink),
     muted: read('--color-ink-muted', tokens.value.muted),
@@ -69,12 +82,24 @@ onMounted(() => {
   }
 })
 
+watch(showSnapshot, (visible) => {
+  if (import.meta.client) {
+    sessionStorage.setItem(SNAPSHOT_VISIBILITY_KEY, String(visible))
+  }
+})
+
 const todayIndex = computed(() => props.days.findIndex((d) => d.isToday))
 const selectedIndex = computed(() => props.days.findIndex((d) => d.date === props.selectedDate))
+const snapshotBalances = computed(
+  () => new Map(visibleSnapshot.value?.points.map((point) => [point.date, point.balance]) ?? []),
+)
 
 /** Escala com folga só onde importa: embaixo apenas quando há saldo negativo. */
 const yBounds = computed(() => {
-  const values = props.days.map((d) => d.balance)
+  const values = [
+    ...props.days.map((d) => d.balance),
+    ...(visibleSnapshot.value?.points.map((point) => point.balance) ?? []),
+  ]
   if (!values.length) return { min: 0, max: 1000 }
   const rawMin = Math.min(0, ...values)
   const rawMax = Math.max(...values, 100)
@@ -100,9 +125,8 @@ const pointColor = computed(() =>
   ),
 )
 
-const chartData = computed(() => ({
-  labels: props.days.map((d) => String(d.day)),
-  datasets: [
+const chartData = computed<ChartData<'line'>>(() => {
+  const datasets: ChartData<'line'>['datasets'] = [
     {
       label: 'Saldo',
       data: props.days.map((d) => d.balance),
@@ -136,8 +160,32 @@ const chartData = computed(() => ({
       pointBorderColor: tokens.value.surface,
       pointBorderWidth: 1.5,
     },
-  ],
-}))
+  ]
+
+  if (visibleSnapshot.value) {
+    datasets.push({
+      label: 'Previsto no início do mês',
+      data: props.days.map(
+        (day) => snapshotBalances.value.get(day.date) ?? null,
+      ),
+      borderColor: tokens.value.snapshot,
+      borderWidth: 2,
+      borderDash: [6, 5],
+      backgroundColor: 'transparent',
+      fill: false,
+      cubicInterpolationMode: 'monotone' as const,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      pointBackgroundColor: tokens.value.snapshot,
+      spanGaps: true,
+    })
+  }
+
+  return {
+    labels: props.days.map((d) => String(d.day)),
+    datasets,
+  }
+})
 
 /** Linha tracejada do dia de hoje, desenhada por baixo dos pontos. */
 const todayLine: Plugin<'line'> = {
@@ -292,6 +340,22 @@ function formatMoney(value: number) {
 function formatSignedMoney(value: number) {
   return `${value >= 0 ? '+' : ''}${formatMoney(value)}`
 }
+
+function snapshotBalance(day: CashFlowDay) {
+  return snapshotBalances.value.get(day.date) ?? null
+}
+
+function formatSnapshotDate(value: string) {
+  const [year, month, day] = value.slice(0, 10).split('-')
+  return `${day}/${month}/${year}`
+}
+
+const snapshotLegend = computed(() => {
+  if (!visibleSnapshot.value) return ''
+  return visibleSnapshot.value.kind === 'scheduled'
+    ? 'Previsto no início do mês'
+    : `Referência capturada em ${formatSnapshotDate(visibleSnapshot.value.createdAt)}`
+})
 </script>
 
 <template>
@@ -309,11 +373,25 @@ function formatSignedMoney(value: number) {
     :style="{ '--cash-flow-critical': CRITICAL_COLOR }"
   >
     <div class="cash-flow-chart__heading">
-      <h2>Saldo dia a dia</h2>
-      <p>
-        Saldo nas contas bancárias (projetado) — alinhado ao previsto do
-        dashboard
-      </p>
+      <div>
+        <h2>Saldo dia a dia</h2>
+        <p>
+          Saldo nas contas bancárias (projetado) — alinhado ao previsto do
+          dashboard
+        </p>
+      </div>
+      <button
+        v-if="snapshot"
+        type="button"
+        class="cash-flow-chart__snapshot-toggle"
+        :class="{ 'is-active': showSnapshot }"
+        :aria-pressed="showSnapshot"
+        @click="showSnapshot = !showSnapshot"
+      >
+        <EyeOff v-if="showSnapshot" aria-hidden="true" />
+        <Eye v-else aria-hidden="true" />
+        {{ showSnapshot ? 'Ocultar referência' : 'Mostrar referência' }}
+      </button>
     </div>
 
     <div class="cash-flow-chart__plot-wrap">
@@ -338,6 +416,20 @@ function formatSignedMoney(value: number) {
           <span v-if="tooltip.day.isToday">· hoje</span>
         </strong>
         <p>Saldo: {{ formatMoney(tooltip.day.balance) }}</p>
+        <template v-if="snapshotBalance(tooltip.day) !== null">
+          <p>
+            Previsto no início:
+            {{ formatMoney(snapshotBalance(tooltip.day)!) }}
+          </p>
+          <p>
+            Diferença:
+            {{
+              formatSignedMoney(
+                tooltip.day.balance - snapshotBalance(tooltip.day)!,
+              )
+            }}
+          </p>
+        </template>
         <ul v-if="tooltip.day.movements.length" class="cash-flow-chart__tooltip-list">
           <li
             v-for="movement in tooltip.day.movements.slice(0, 4)"
@@ -359,6 +451,12 @@ function formatSignedMoney(value: number) {
       <li>
         <span class="cash-flow-chart__swatch cash-flow-chart__swatch--line" />
         Saldo acumulado
+      </li>
+      <li v-if="visibleSnapshot">
+        <span
+          class="cash-flow-chart__swatch cash-flow-chart__swatch--snapshot"
+        />
+        {{ snapshotLegend }}
       </li>
       <li>
         <span class="cash-flow-chart__swatch cash-flow-chart__swatch--today" />
@@ -383,6 +481,10 @@ function formatSignedMoney(value: number) {
 }
 
 .cash-flow-chart__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
   margin-bottom: var(--space-3);
 }
 
@@ -396,6 +498,33 @@ function formatSignedMoney(value: number) {
   margin-top: var(--space-1);
   color: var(--color-ink-muted);
   font-size: var(--text-xs);
+}
+
+.cash-flow-chart__snapshot-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.cash-flow-chart__snapshot-toggle:hover,
+.cash-flow-chart__snapshot-toggle.is-active {
+  border-color: var(--color-border-strong);
+  color: var(--color-ink);
+}
+
+.cash-flow-chart__snapshot-toggle svg {
+  width: 0.9rem;
+  height: 0.9rem;
 }
 
 .cash-flow-chart__plot-wrap {
@@ -508,11 +637,23 @@ function formatSignedMoney(value: number) {
   border-radius: 0;
 }
 
+.cash-flow-chart__swatch--snapshot {
+  height: 0;
+  border-top: 2px dashed var(--color-ink-muted);
+  background: none;
+  border-radius: 0;
+}
+
 .cash-flow-chart__swatch--critical {
   background: var(--cash-flow-critical);
 }
 
 @media (max-width: 640px) {
+  .cash-flow-chart__heading {
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
   .cash-flow-chart__plot-wrap {
     height: 15rem;
   }

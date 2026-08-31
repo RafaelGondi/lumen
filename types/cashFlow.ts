@@ -29,6 +29,21 @@ export interface CashFlowDay {
   movements: CashFlowMovement[]
 }
 
+export type CashFlowSnapshotKind = 'scheduled' | 'recovery'
+
+export interface CashFlowSnapshotPoint {
+  date: string
+  balance: number
+}
+
+export interface CashFlowSnapshot {
+  id: number
+  snapshotMonth: string
+  kind: CashFlowSnapshotKind
+  createdAt: string
+  points: CashFlowSnapshotPoint[]
+}
+
 export interface CashFlowReport {
   month: string
   fullLabel: string
@@ -43,4 +58,6 @@ export interface CashFlowReport {
   closingBalance: number
   closingDelta: number
   days: CashFlowDay[]
+  /** Curva preservada no início do mês, quando disponível. */
+  snapshot: CashFlowSnapshot | null
 }

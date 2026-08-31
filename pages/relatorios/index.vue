@@ -257,6 +257,7 @@ function movementMeta(movement: CashFlowMovement) {
         <ReportsCashFlowChart
           v-else-if="report"
           :days="report.days"
+          :snapshot="report.snapshot"
           :selected-date="selectedDate"
           :critical-threshold="report.criticalThreshold"
           @select="selectedDate = $event"
