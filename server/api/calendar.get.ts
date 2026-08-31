@@ -23,5 +23,27 @@ export default defineEventHandler((event) => {
     ? (filterRaw as SpendingRecurrenceFilter)
     : 'all'
 
-  return buildSpendingCalendar(useDb(), month, filter)
+  const categoryIds =
+    typeof query.categories === 'string'
+      ? query.categories
+          .split(',')
+          .map(Number)
+          .filter((value) => Number.isInteger(value) && value > 0)
+      : []
+
+  const supercategoryIds =
+    typeof query.supercategories === 'string'
+      ? query.supercategories
+          .split(',')
+          .map(Number)
+          .filter((value) => Number.isInteger(value) && value > 0)
+      : []
+
+  return buildSpendingCalendar(
+    useDb(),
+    month,
+    filter,
+    categoryIds,
+    supercategoryIds,
+  )
 })

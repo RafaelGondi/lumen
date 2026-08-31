@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { CalendarDays, X } from '@lucide/vue'
+import type { Category, Supercategory } from '~/types/category'
 import type {
   SpendingCalendarDay,
   SpendingCalendarItem,
@@ -29,6 +30,9 @@ const selectedYear = ref(now.getFullYear())
 const selectedMonth = ref(now.getMonth() + 1)
 const selectedDate = ref<string | null>(null)
 const filter = ref<SpendingRecurrenceFilter>('all')
+const filterDimension = ref<'category' | 'supercategory'>('category')
+const selectedCategoryIds = ref<number[]>([])
+const selectedSupercategoryIds = ref<number[]>([])
 
 const filterOptions = [
   { value: 'all' as const, label: 'Tudo' },
@@ -37,10 +41,81 @@ const filterOptions = [
   { value: 'fixed' as const, label: 'Fixo' },
 ]
 
+const filterDimensionOptions = [
+  { value: 'category' as const, label: 'Categoria' },
+  { value: 'supercategory' as const, label: 'Supercategoria' },
+]
+
 const monthKey = computed(
   () =>
     `${selectedYear.value}-${String(selectedMonth.value).padStart(2, '0')}`,
 )
+
+const categoryQuery = computed(() =>
+  selectedCategoryIds.value.length
+    ? `&categories=${selectedCategoryIds.value.join(',')}`
+    : '',
+)
+
+const supercategoryQuery = computed(() =>
+  selectedSupercategoryIds.value.length
+    ? `&supercategories=${selectedSupercategoryIds.value.join(',')}`
+    : '',
+)
+
+const { data: categories } = await useFetch<Category[]>('/api/categories', {
+  default: () => [],
+})
+
+const expenseCategories = computed(() =>
+  categories.value.filter((category) => category.type === 'expense'),
+)
+
+const { data: supercategories } = await useFetch<Supercategory[]>(
+  '/api/supercategories',
+  { default: () => [] },
+)
+
+const expenseSupercategories = computed(() =>
+  supercategories.value.filter((supercategory) =>
+    supercategory.categories.some((category) => category.type === 'expense'),
+  ),
+)
+
+const selectedDimensionIds = computed<number[]>({
+  get: () =>
+    filterDimension.value === 'category'
+      ? selectedCategoryIds.value
+      : selectedSupercategoryIds.value,
+  set: (value) => {
+    if (filterDimension.value === 'category') {
+      selectedCategoryIds.value = value
+    } else {
+      selectedSupercategoryIds.value = value
+    }
+  },
+})
+
+const dimensionOptions = computed(() =>
+  filterDimension.value === 'category'
+    ? expenseCategories.value
+    : expenseSupercategories.value,
+)
+
+const dimensionSingular = computed(() =>
+  filterDimension.value === 'category' ? 'categoria' : 'supercategoria',
+)
+
+const dimensionPlural = computed(() =>
+  filterDimension.value === 'category' ? 'Categorias' : 'Supercategorias',
+)
+
+const hasDimensionFilter = computed(() => selectedDimensionIds.value.length > 0)
+
+watch(filterDimension, () => {
+  selectedCategoryIds.value = []
+  selectedSupercategoryIds.value = []
+})
 
 const monthLabel = computed(
   () => `${MONTH_NAMES[selectedMonth.value - 1]} de ${selectedYear.value}`,
@@ -66,9 +141,10 @@ const {
   pending,
   error,
 } = await useFetch<SpendingCalendarReport>(
-  () => `/api/calendar?month=${monthKey.value}&filter=${filter.value}`,
+  () =>
+    `/api/calendar?month=${monthKey.value}&filter=${filter.value}${categoryQuery.value}${supercategoryQuery.value}`,
   {
-    watch: [monthKey, filter],
+    watch: [monthKey, filter, categoryQuery, supercategoryQuery],
     default: () => null,
   },
 )
@@ -80,15 +156,21 @@ watch(
       selectedDate.value = null
       return
     }
+    const currentSelection = value.days.find(
+      (day) => day.date === selectedDate.value,
+    )
     if (
-      selectedDate.value &&
-      value.days.some((day) => day.date === selectedDate.value)
+      currentSelection &&
+      (currentSelection.count > 0 ||
+        (selectedCategoryIds.value.length === 0 &&
+          selectedSupercategoryIds.value.length === 0))
     ) {
       return
     }
     const today = value.days.find((day) => day.isToday)
     const firstSpend = value.days.find((day) => day.count > 0)
-    selectedDate.value = today?.date ?? firstSpend?.date ?? value.days[0]!.date
+    selectedDate.value =
+      firstSpend?.date ?? today?.date ?? value.days[0]!.date
   },
   { immediate: true },
 )
@@ -248,6 +330,25 @@ function itemMeta(item: SpendingCalendarItem) {
                 {{ report.stats.daysInMonth }}</strong
               >
             </p>
+          </div>
+
+          <div class="calendar-board__dimension-filters">
+            <CategoriesCategoryMultiFilter
+              v-model="selectedDimensionIds"
+              v-model:scope="filterDimension"
+              :options="dimensionOptions"
+              :singular="dimensionSingular"
+              :plural="dimensionPlural"
+              :scope-options="filterDimensionOptions"
+            />
+            <div
+              v-if="hasDimensionFilter && report"
+              class="calendar-board__filter-total"
+              aria-live="polite"
+            >
+              <span>Total filtrado</span>
+              <strong><UiMoney :value="report.monthTotal" /></strong>
+            </div>
           </div>
         </div>
 
@@ -451,6 +552,37 @@ function itemMeta(item: SpendingCalendarItem) {
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-3);
+}
+
+.calendar-board__dimension-filters {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.calendar-board__filter-total {
+  display: flex;
+  min-height: 2.25rem;
+  margin-left: auto;
+  padding: 0 var(--space-3);
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+}
+
+.calendar-board__filter-total span {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.calendar-board__filter-total strong {
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
 }
 
 .calendar-board__counter {
@@ -771,6 +903,17 @@ function itemMeta(item: SpendingCalendarItem) {
   .calendar-board__counter {
     width: 100%;
     text-align: right;
+  }
+
+  .calendar-board__dimension-filters {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-board__filter-total {
+    width: 100%;
+    margin-left: 0;
+    justify-content: space-between;
   }
 
   .calendar-grid__head,

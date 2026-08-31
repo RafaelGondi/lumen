@@ -61,6 +61,11 @@ type CategoryMeta = {
   icon: string
 }
 
+type CategoryHierarchy = {
+  id: number
+  supercategoryId: number | null
+}
+
 function monthIndex(month: string) {
   const [year, value] = month.split('-').map(Number)
   return year! * 12 + value! - 1
@@ -153,6 +158,17 @@ function loadCategories(db: Database.Database) {
     )
     .all() as CategoryMeta[]
   return new Map(rows.map((row) => [row.id, row]))
+}
+
+function loadCategoryHierarchy(db: Database.Database) {
+  const rows = db
+    .prepare(
+      `SELECT id, supercategory_id AS supercategoryId
+       FROM categories
+       WHERE type = 'expense'`,
+    )
+    .all() as CategoryHierarchy[]
+  return new Map(rows.map((row) => [row.id, row.supercategoryId]))
 }
 
 function isValidCardOccurrence(parent: CardParent, index: number) {
@@ -298,10 +314,19 @@ function accountItemsForMonth(
   month: string,
   filter: SpendingRecurrenceFilter,
 ) {
+  const invoicePaymentEntryIds = new Set(
+    (
+      db
+        .prepare('SELECT entry_id AS entryId FROM card_invoice_payments')
+        .all() as { entryId: number }[]
+    ).map((row) => row.entryId),
+  )
+
   return occurrencesForCashMonth(db, month)
     .filter(
       (occurrence) =>
         occurrence.type === 'expense' &&
+        !invoicePaymentEntryIds.has(occurrence.parentId) &&
         matchesFilter(occurrence.recurrence, filter),
     )
     .map(
@@ -395,6 +420,8 @@ export function buildSpendingCalendar(
   db: Database.Database,
   month: string,
   filter: SpendingRecurrenceFilter,
+  categoryIds: number[] = [],
+  supercategoryIds: number[] = [],
 ): SpendingCalendarReport {
   if (!/^\d{4}-\d{2}$/.test(month)) {
     throw createError({
@@ -405,14 +432,29 @@ export function buildSpendingCalendar(
 
   const { daysInMonth, year, month: monthNumber } = monthBounds(month)
   const today = todayIsoLocal()
+  const selectedCategoryIds = new Set(categoryIds)
+  const selectedSupercategoryIds = new Set(supercategoryIds)
+  const categoryHierarchy = loadCategoryHierarchy(db)
   const items = [
     ...accountItemsForMonth(db, month, filter),
     ...cardItemsForMonth(db, month, filter),
-  ].sort(
-    (a, b) =>
-      b.amount - a.amount ||
-      a.description.localeCompare(b.description, 'pt-BR'),
-  )
+  ]
+    .filter(
+      (item) =>
+        (selectedCategoryIds.size === 0 ||
+          (item.categoryId !== null &&
+            selectedCategoryIds.has(item.categoryId))) &&
+        (selectedSupercategoryIds.size === 0 ||
+          (item.categoryId !== null &&
+            selectedSupercategoryIds.has(
+              categoryHierarchy.get(item.categoryId) ?? -1,
+            ))),
+    )
+    .sort(
+      (a, b) =>
+        b.amount - a.amount ||
+        a.description.localeCompare(b.description, 'pt-BR'),
+    )
 
   const byDate = new Map<string, SpendingCalendarItem[]>()
   for (const item of items) {
