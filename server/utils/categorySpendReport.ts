@@ -82,8 +82,19 @@ function loadCardClosingDays(db: Database.Database) {
   return new Map(rows.map((row) => [row.id, row.closingDay]))
 }
 
-function collectSpendingItems(db: Database.Database, month: string) {
-  const calendar = buildSpendingCalendar(db, month, 'all')
+function collectSpendingItems(
+  db: Database.Database,
+  month: string,
+  dateBasis: 'cash' | 'competence',
+) {
+  const calendar = buildSpendingCalendar(
+    db,
+    month,
+    'all',
+    [],
+    [],
+    dateBasis,
+  )
   const paymentEntryIds = invoicePaymentEntryIds(db)
   return calendar.days
     .flatMap((day) => day.items)
@@ -245,8 +256,9 @@ export function buildCategorySpendReport(
   db: Database.Database,
   month: string,
   scope: CategorySpendScope,
+  dateBasis: 'cash' | 'competence' = 'cash',
 ): CategorySpendReport {
-  const items = collectSpendingItems(db, month)
+  const items = collectSpendingItems(db, month, dateBasis)
   const closingDays = loadCardClosingDays(db)
   const superByCategory = loadSuperByCategory(db)
   const metaMap =
@@ -303,7 +315,14 @@ export function buildCategorySpendReport(
       a.label.localeCompare(b.label, 'pt-BR', { sensitivity: 'base' }),
   )
 
-  const calendar = buildSpendingCalendar(db, month, 'all')
+  const calendar = buildSpendingCalendar(
+    db,
+    month,
+    'all',
+    [],
+    [],
+    dateBasis,
+  )
 
   return {
     month,

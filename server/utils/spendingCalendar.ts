@@ -7,7 +7,10 @@ import type {
   SpendingRecurrenceFilter,
 } from '~/types/spendingCalendar'
 import { addMonthsScheduled, roundMoney } from '~/utils/dateMoney'
-import { occurrencesForCashMonth } from './occurrences'
+import {
+  occurrencesForCashMonth,
+  occurrencesForCompetenceMonth,
+} from './occurrences'
 
 const MONTH_NAMES = [
   'Janeiro',
@@ -313,6 +316,7 @@ function accountItemsForMonth(
   db: Database.Database,
   month: string,
   filter: SpendingRecurrenceFilter,
+  dateBasis: 'cash' | 'competence',
 ) {
   const invoicePaymentEntryIds = new Set(
     (
@@ -322,7 +326,12 @@ function accountItemsForMonth(
     ).map((row) => row.entryId),
   )
 
-  return occurrencesForCashMonth(db, month)
+  const occurrences =
+    dateBasis === 'competence'
+      ? occurrencesForCompetenceMonth(db, month)
+      : occurrencesForCashMonth(db, month)
+
+  return occurrences
     .filter(
       (occurrence) =>
         occurrence.type === 'expense' &&
@@ -422,6 +431,7 @@ export function buildSpendingCalendar(
   filter: SpendingRecurrenceFilter,
   categoryIds: number[] = [],
   supercategoryIds: number[] = [],
+  dateBasis: 'cash' | 'competence' = 'cash',
 ): SpendingCalendarReport {
   if (!/^\d{4}-\d{2}$/.test(month)) {
     throw createError({
@@ -436,7 +446,7 @@ export function buildSpendingCalendar(
   const selectedSupercategoryIds = new Set(supercategoryIds)
   const categoryHierarchy = loadCategoryHierarchy(db)
   const items = [
-    ...accountItemsForMonth(db, month, filter),
+    ...accountItemsForMonth(db, month, filter, dateBasis),
     ...cardItemsForMonth(db, month, filter),
   ]
     .filter(

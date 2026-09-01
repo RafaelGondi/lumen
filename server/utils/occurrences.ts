@@ -381,6 +381,48 @@ export function occurrencesForCashMonth(
   )
 }
 
+export function occurrencesForCompetenceMonth(
+  db: Database.Database,
+  competenceMonth: string,
+  accountId?: number,
+): EntryOccurrence[] {
+  const today = todayLocal()
+  const parents = loadParents(db, accountId)
+  const payments = loadPayments(db)
+  const exceptions = loadExceptions(db)
+  const categories = loadCategories(db)
+  const result = new Map<string, EntryOccurrence>()
+
+  for (const parent of parents) {
+    const candidates = candidateMonthsForCashMonth(
+      db,
+      parent,
+      competenceMonth,
+    )
+    for (const occurrenceMonth of candidates) {
+      const occurrence = deriveOccurrence(
+        parent,
+        occurrenceMonth,
+        payments,
+        exceptions,
+        categories,
+        today,
+        accountId,
+      )
+      if (occurrence?.dueDate?.slice(0, 7) === competenceMonth) {
+        result.set(occurrence.occurrenceKey, {
+          ...occurrence,
+          date: occurrence.dueDate,
+        })
+      }
+    }
+  }
+
+  return [...result.values()].sort(
+    (a, b) => b.date.localeCompare(a.date) || b.id - a.id,
+  )
+}
+
 function occurrenceMonthsThrough(
   parent: ParentEntry,
   cutoff: string,
