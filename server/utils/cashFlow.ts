@@ -132,7 +132,10 @@ function loadActiveCards(db: Database.Database): Card[] {
   }))
 }
 
-function occurrenceToMovement(occurrence: EntryOccurrence): CashFlowMovement {
+function occurrenceToMovement(
+  occurrence: EntryOccurrence,
+  affectsBalance = occurrence.settled,
+): CashFlowMovement {
   const signedAmount =
     occurrence.type === 'income' ? occurrence.amount : -occurrence.amount
   return {
@@ -140,6 +143,7 @@ function occurrenceToMovement(occurrence: EntryOccurrence): CashFlowMovement {
     description: occurrence.description,
     amount: occurrence.amount,
     signedAmount: roundMoney(signedAmount),
+    affectsBalance,
     type: occurrence.type === 'income' ? 'income' : 'expense',
     statusLabel: occurrence.settled
       ? occurrence.type === 'income'
@@ -166,6 +170,7 @@ function cardInvoiceMovementsForMonth(
   db: Database.Database,
   cards: Card[],
   invoiceMonth: string,
+  affectsBalance: boolean,
 ): CashFlowMovement[] {
   const movements: CashFlowMovement[] = []
   for (const card of cards) {
@@ -176,6 +181,7 @@ function cardInvoiceMovementsForMonth(
       description: `Fatura ${card.name}`,
       amount: invoice.total,
       signedAmount: roundMoney(-invoice.total),
+      affectsBalance,
       type: 'card_invoice',
       statusLabel: 'Projetado',
       accountLabel: card.name,
@@ -224,7 +230,7 @@ function collectProjectedMovements(
       const signed = projectedAccountSigned(occurrence)
       if (signed === null) continue
       result.push({
-        ...occurrenceToMovement(occurrence),
+        ...occurrenceToMovement(occurrence, true),
         signedAmount: roundMoney(signed),
         date: occurrence.date,
       })
@@ -241,6 +247,7 @@ function collectProjectedMovements(
         description: `Fatura ${card.name}`,
         amount: invoice.total,
         signedAmount: roundMoney(-invoice.total),
+        affectsBalance: true,
         type: 'card_invoice',
         statusLabel: 'Projetado',
         accountLabel: card.name,
@@ -312,14 +319,20 @@ function dayMovements(
 
   for (const occurrence of occurrencesForCashMonth(db, month)) {
     if (occurrence.date !== date) continue
-    movements.push(occurrenceToMovement(occurrence))
+    const affectsBalance =
+      date <= today
+        ? occurrence.settled
+        : projectedAccountSigned(occurrence) !== null
+    movements.push(occurrenceToMovement(occurrence, affectsBalance))
   }
 
   // Fatura no vencimento: só a partir de hoje (sem inventar pagamento histórico).
   for (const card of cards) {
     const dueDate = dueDateInMonth(month, card.dueDay)
     if (dueDate !== date || date < today) continue
-    movements.push(...cardInvoiceMovementsForMonth(db, [card], month))
+    movements.push(
+      ...cardInvoiceMovementsForMonth(db, [card], month, date > today),
+    )
   }
 
   return movements.sort(

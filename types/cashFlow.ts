@@ -8,6 +8,8 @@ export interface CashFlowMovement {
   amount: number
   /** Valor com sinal: receita +, despesa/fatura − */
   signedAmount: number
+  /** Se a movimentação já participa do saldo exibido para o dia. */
+  affectsBalance: boolean
   type: CashFlowMovementType
   statusLabel: string
   accountLabel: string | null

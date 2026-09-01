@@ -15,7 +15,11 @@ import {
   type ScriptableLineSegmentContext,
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
-import type { CashFlowDay, CashFlowSnapshot } from '~/types/cashFlow'
+import type {
+  CashFlowDay,
+  CashFlowMonthKind,
+  CashFlowSnapshot,
+} from '~/types/cashFlow'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip)
 
@@ -24,6 +28,7 @@ const props = defineProps<{
   snapshot: CashFlowSnapshot | null
   selectedDate: string | null
   criticalThreshold?: number
+  monthKind: CashFlowMonthKind
 }>()
 
 const emit = defineEmits<{
@@ -141,6 +146,17 @@ const chartData = computed<ChartData<'line'>>(() => {
         borderColor: (ctx: ScriptableLineSegmentContext) => {
           const menor = Math.min(ctx.p0.parsed.y ?? Infinity, ctx.p1.parsed.y ?? Infinity)
           return menor <= threshold.value ? tokens.value.critical : tokens.value.line
+        },
+        borderDash: (ctx: ScriptableLineSegmentContext) => {
+          if (props.monthKind === 'future') return [6, 5]
+          if (
+            props.monthKind === 'current' &&
+            todayIndex.value >= 0 &&
+            ctx.p0DataIndex >= todayIndex.value
+          ) {
+            return [6, 5]
+          }
+          return undefined
         },
       },
       backgroundColor: (ctx: { chart: Chart }) => {
@@ -356,6 +372,19 @@ const snapshotLegend = computed(() => {
     ? 'Previsto no início do mês'
     : `Referência capturada em ${formatSnapshotDate(visibleSnapshot.value.createdAt)}`
 })
+
+const chartDescription = computed(() => {
+  if (props.monthKind === 'past') {
+    return 'Saldo consolidado nas contas bancárias ao longo do mês.'
+  }
+  if (props.monthKind === 'future') {
+    return 'Projeção do saldo a partir dos lançamentos já conhecidos.'
+  }
+  return 'Saldo consolidado até hoje e projeção pelos lançamentos conhecidos.'
+})
+
+const hasRealizedSegment = computed(() => props.monthKind !== 'future')
+const hasProjectedSegment = computed(() => props.monthKind !== 'past')
 </script>
 
 <template>
@@ -375,10 +404,7 @@ const snapshotLegend = computed(() => {
     <div class="cash-flow-chart__heading">
       <div>
         <h2>Saldo dia a dia</h2>
-        <p>
-          Saldo nas contas bancárias (projetado) — alinhado ao previsto do
-          dashboard
-        </p>
+        <p>{{ chartDescription }}</p>
       </div>
       <button
         v-if="snapshot"
@@ -448,9 +474,15 @@ const snapshotLegend = computed(() => {
     </div>
 
     <ul class="cash-flow-chart__legend">
-      <li>
+      <li v-if="hasRealizedSegment">
         <span class="cash-flow-chart__swatch cash-flow-chart__swatch--line" />
-        Saldo acumulado
+        Saldo realizado
+      </li>
+      <li v-if="hasProjectedSegment">
+        <span
+          class="cash-flow-chart__swatch cash-flow-chart__swatch--projected"
+        />
+        Saldo projetado
       </li>
       <li v-if="visibleSnapshot">
         <span
@@ -640,6 +672,13 @@ const snapshotLegend = computed(() => {
 .cash-flow-chart__swatch--snapshot {
   height: 0;
   border-top: 2px dashed var(--color-ink-muted);
+  background: none;
+  border-radius: 0;
+}
+
+.cash-flow-chart__swatch--projected {
+  height: 0;
+  border-top: 2px dashed var(--cash-flow-line);
   background: none;
   border-radius: 0;
 }
