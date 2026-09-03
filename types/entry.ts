@@ -77,6 +77,8 @@ export interface EntryOccurrenceEditPayload {
   statementName: string | null
   notes: string | null
   date: string
+  /** Novo término da série fixa. Null mantém a recorrência sem data final. */
+  endDate?: string | null
 }
 
 /** @deprecated Use EntryPayload */

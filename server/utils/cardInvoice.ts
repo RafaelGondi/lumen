@@ -86,6 +86,7 @@ function invoiceEntries(
       amount: occurrence.amount,
       statementName: occurrence.statementName,
       recurrence: occurrence.recurrence,
+      endDate: occurrence.endDate,
       installmentCount: occurrence.installmentCount,
       installmentIndex: occurrence.installmentIndex,
       useMonthEnd: occurrence.useMonthEnd,

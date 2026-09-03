@@ -26,6 +26,8 @@ export interface CardExpenseEditPayload {
   statementName: string | null
   notes: string | null
   date: string
+  /** Novo término da série fixa. Null mantém a recorrência sem data final. */
+  endDate?: string | null
   /** Total de parcelas da série; só aplica em escopo series/future. */
   installmentCount: number | null
 }
@@ -76,4 +78,3 @@ export interface CardExpenseOccurrence {
   useMonthEnd: boolean
   isException: boolean
 }
-

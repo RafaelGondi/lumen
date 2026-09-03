@@ -75,6 +75,14 @@ const expenseCategories = computed(() =>
   categories.value.filter((category) => category.type === 'expense'),
 )
 const amountValue = computed(() => parseMoney(amountText.value))
+const endMonth = computed({
+  get: () => parseDateBr(endDateText.value)?.slice(0, 7) ?? '',
+  set: (month: string) => {
+    endDateText.value = /^\d{4}-\d{2}$/.test(month)
+      ? formatDateBr(monthEndLocal(`${month}-01`))
+      : ''
+  },
+})
 const showScope = computed(
   () => isEditing.value && recurrence.value !== 'single',
 )
@@ -220,7 +228,7 @@ function resetForm() {
     installmentCount.value = current.installmentCount ?? 2
     useMonthEnd.value = current.useMonthEnd
     editScope.value = 'occurrence'
-    endDateText.value = ''
+    endDateText.value = current.endDate ? formatDateBr(current.endDate) : ''
     return
   }
 
@@ -251,6 +259,20 @@ function resetForm() {
   installmentCount.value = 2
   useMonthEnd.value = false
   editScope.value = 'occurrence'
+}
+
+function setFixedEnd(mode: 'before' | 'current' | 'open') {
+  if (!props.expense || recurrence.value !== 'fixed') return
+  if (mode === 'open') {
+    endDateText.value = ''
+  } else {
+    const currentMonthEnd = monthEndLocal(`${props.expense.occurrenceMonth}-01`)
+    endDateText.value = formatDateBr(
+      mode === 'current'
+        ? currentMonthEnd
+        : monthEndLocal(addMonthsLocal(currentMonthEnd, -1)),
+    )
+  }
 }
 
 watch(open, (value) => {
@@ -297,6 +319,14 @@ async function save() {
       const countChanged =
         props.expense.recurrence === 'installment' &&
         installmentCount.value !== (props.expense.installmentCount ?? null)
+      let endDate: string | null = null
+      if (props.expense.recurrence === 'fixed' && endDateText.value.trim()) {
+        endDate = parseDateBr(endDateText.value)
+        if (!endDate) {
+          errorMessage.value = 'Data de fim inválida.'
+          return
+        }
+      }
       const scope =
         props.expense.recurrence === 'single'
           ? 'series'
@@ -316,6 +346,10 @@ async function save() {
             statementName: statementName.value.trim() || null,
             notes: notes.value.trim() || null,
             date: purchaseDate,
+            ...(props.expense.recurrence === 'fixed' &&
+            endDate !== props.expense.endDate
+              ? { endDate }
+              : {}),
             installmentCount:
               props.expense.recurrence === 'installment'
                 ? installmentCount.value
@@ -533,6 +567,39 @@ async function save() {
       </div>
       <UiDateField v-else v-model="dateText" label="Data" required />
 
+      <div
+        v-if="isEditing && recurrence === 'fixed'"
+        class="card-expense-form__fixed-end"
+      >
+        <div class="card-expense-form__section">
+          <p class="card-expense-form__label">Último mês da recorrência</p>
+          <input
+            v-model="endMonth"
+            type="month"
+            lang="pt-BR"
+            aria-label="Último mês da recorrência"
+          />
+          <small>
+            O término vale para a recorrência, sem alterar os meses anteriores. Deixe vazio para continuar sem data final.
+          </small>
+        </div>
+        <div class="card-expense-form__fixed-actions">
+          <button
+            v-if="(expense?.occurrenceIndex ?? 1) > 1"
+            type="button"
+            @click="setFixedEnd('before')"
+          >
+            Encerrar antes deste mês
+          </button>
+          <button type="button" @click="setFixedEnd('current')">
+            Este é o último mês
+          </button>
+          <button type="button" @click="setFixedEnd('open')">
+            Sem data final
+          </button>
+        </div>
+      </div>
+
       <label
         v-if="recurrence === 'fixed' && !isEditing"
         class="card-expense-form__month-end"
@@ -704,6 +771,45 @@ async function save() {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
+}
+
+.card-expense-form__fixed-end {
+  display: flex;
+  padding: var(--space-4);
+  flex-direction: column;
+  gap: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+}
+
+.card-expense-form__fixed-end small {
+  color: var(--color-ink-muted);
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+}
+
+.card-expense-form__fixed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.card-expense-form__fixed-actions button {
+  min-height: 2rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+.card-expense-form__fixed-actions button:hover {
+  border-color: var(--color-negative);
+  color: var(--color-negative-ink);
 }
 
 .card-expense-form__month-end {

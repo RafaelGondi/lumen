@@ -151,10 +151,19 @@ export function parseCardExpenseEditPayload(
     installmentCount = raw.installmentCount
   }
 
+  let endDate: string | null | undefined
+  if (Object.prototype.hasOwnProperty.call(raw, 'endDate')) {
+    endDate =
+      raw.endDate === null || raw.endDate === ''
+        ? null
+        : parseIsoDate(raw.endDate, 'Data de fim')
+  }
+
   return {
     ...common,
     scope: raw.scope as EntrySeriesScope,
     occurrenceMonth: raw.occurrenceMonth,
+    endDate,
     installmentCount,
   }
 }
@@ -166,4 +175,3 @@ export function parseExpenseId(value: string | undefined) {
   }
   return id
 }
-

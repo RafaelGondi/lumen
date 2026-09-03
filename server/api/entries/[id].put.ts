@@ -111,6 +111,21 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const requestedEndDate =
+    body.endDate === undefined ? parent.endDate : body.endDate
+
+  if (
+    parent.recurrence === 'fixed' &&
+    requestedEndDate !== null &&
+    (!validDate(requestedEndDate) || requestedEndDate < parent.date)
+  ) {
+    throw createError({
+      statusCode: 400,
+      statusMessage:
+        'A data final deve ser igual ou posterior ao início da recorrência.',
+    })
+  }
+
   if (body.categoryId !== null) {
     const category = db
       .prepare('SELECT id FROM categories WHERE id = ? AND type = ?')
@@ -153,6 +168,26 @@ export default defineEventHandler(async (event) => {
       return
     }
 
+    const fixedEndChanged =
+      parent.recurrence === 'fixed' && requestedEndDate !== parent.endDate
+    if (fixedEndChanged) {
+      db.prepare('UPDATE entries SET end_date = ? WHERE id = ?').run(
+        requestedEndDate,
+        id,
+      )
+      const occurrenceUnchanged =
+        values.description === occurrence.description &&
+        values.amount === occurrence.amount &&
+        values.categoryId === occurrence.categoryId &&
+        values.statementName === occurrence.statementName &&
+        values.notes === occurrence.notes &&
+        values.date === occurrence.dueDate
+      const endsBeforeEditedOccurrence =
+        requestedEndDate !== null &&
+        requestedEndDate.slice(0, 7) < body.occurrenceMonth
+      if (occurrenceUnchanged || endsBeforeEditedOccurrence) return
+    }
+
     if (body.scope === 'occurrence') {
       db.prepare(
         `INSERT INTO entry_occurrence_exceptions (
@@ -181,14 +216,19 @@ export default defineEventHandler(async (event) => {
       return
     }
 
-    const originalSpan =
-      parent.endDate
-        ? monthIndex(parent.endDate.slice(0, 7)) -
-          monthIndex(parent.date.slice(0, 7))
-        : null
-    const seriesStartDate = parent.useMonthEnd
+    const editedOccurrenceDate = parent.useMonthEnd
       ? monthEndLocal(values.date)
       : values.date
+    const seriesStartDate =
+      occurrence.occurrenceIndex === 1
+        ? editedOccurrenceDate
+        : parent.useMonthEnd
+          ? monthEndLocal(parent.date)
+          : parent.date
+    const originalSpan = parent.endDate
+      ? monthIndex(parent.endDate.slice(0, 7)) -
+        monthIndex(parent.date.slice(0, 7))
+      : null
 
     if (body.scope === 'series' || occurrence.occurrenceIndex === 1) {
       const endDate =
@@ -198,13 +238,15 @@ export default defineEventHandler(async (event) => {
               (parent.installmentCount ?? 1) - 1,
               Boolean(parent.useMonthEnd),
             )
-          : originalSpan === null
-            ? null
-            : addMonthsScheduled(
-                seriesStartDate,
-                originalSpan,
-                Boolean(parent.useMonthEnd),
-              )
+          : body.endDate !== undefined
+            ? requestedEndDate
+            : originalSpan === null
+              ? null
+              : addMonthsScheduled(
+                  seriesStartDate,
+                  originalSpan,
+                  Boolean(parent.useMonthEnd),
+                )
       const oldStartIndex = monthIndex(parent.date.slice(0, 7))
       const newStartIndex = monthIndex(seriesStartDate.slice(0, 7))
       if (oldStartIndex !== newStartIndex) {
@@ -275,7 +317,7 @@ export default defineEventHandler(async (event) => {
             (remainingCount ?? 1) - 1,
             Boolean(parent.useMonthEnd),
           )
-        : parent.endDate
+        : requestedEndDate
 
     db.prepare(
       `UPDATE entries

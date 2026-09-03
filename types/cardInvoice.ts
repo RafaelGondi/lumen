@@ -39,6 +39,7 @@ export interface CardInvoiceEntry {
   amount: number
   statementName: string | null
   recurrence: 'single' | 'installment' | 'fixed'
+  endDate: string | null
   installmentCount: number | null
   installmentIndex: number | null
   useMonthEnd: boolean

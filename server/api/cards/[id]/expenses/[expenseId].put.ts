@@ -77,6 +77,19 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'Ocorrência da despesa não encontrada.',
     })
   }
+  const requestedEndDate =
+    body.endDate === undefined ? parent.endDate : body.endDate
+  if (
+    parent.recurrence === 'fixed' &&
+    requestedEndDate !== null &&
+    requestedEndDate < parent.date
+  ) {
+    throw createError({
+      statusCode: 400,
+      statusMessage:
+        'A data final deve ser igual ou posterior ao início da recorrência.',
+    })
+  }
 
   if (body.categoryId !== null) {
     const category = db
@@ -123,6 +136,25 @@ export default defineEventHandler(async (event) => {
       return
     }
 
+    const fixedEndChanged =
+      parent.recurrence === 'fixed' && requestedEndDate !== parent.endDate
+    if (fixedEndChanged) {
+      db.prepare(
+        'UPDATE entries SET end_date = ? WHERE id = ? AND card_id = ?',
+      ).run(requestedEndDate, expenseId, cardId)
+      const occurrenceUnchanged =
+        values.description === occurrence.description &&
+        values.amount === occurrence.amount &&
+        values.categoryId === occurrence.categoryId &&
+        values.statementName === occurrence.statementName &&
+        values.notes === occurrence.notes &&
+        values.date === occurrence.date
+      const endsBeforeEditedOccurrence =
+        requestedEndDate !== null &&
+        requestedEndDate.slice(0, 7) < body.occurrenceMonth
+      if (occurrenceUnchanged || endsBeforeEditedOccurrence) return
+    }
+
     if (body.scope === 'occurrence') {
       db.prepare(
         `INSERT INTO entry_occurrence_exceptions (
@@ -158,7 +190,6 @@ export default defineEventHandler(async (event) => {
       ? monthIndex(parent.endDate.slice(0, 7)) -
         monthIndex(parent.date.slice(0, 7))
       : null
-
     if (body.scope === 'series' || occurrence.occurrenceIndex === 1) {
       const installmentCount =
         parent.recurrence === 'installment'
@@ -178,13 +209,15 @@ export default defineEventHandler(async (event) => {
               (installmentCount ?? 1) - 1,
               Boolean(parent.useMonthEnd),
             )
-          : originalSpan === null
-            ? null
-            : addMonthsScheduled(
-                seriesAnchor,
-                originalSpan,
-                Boolean(parent.useMonthEnd),
-              )
+          : body.endDate !== undefined
+            ? requestedEndDate
+            : originalSpan === null
+              ? null
+              : addMonthsScheduled(
+                  seriesAnchor,
+                  originalSpan,
+                  Boolean(parent.useMonthEnd),
+                )
 
       updateParent.run({
         ...values,
@@ -217,7 +250,7 @@ export default defineEventHandler(async (event) => {
             (remainingCount ?? 1) - 1,
             Boolean(parent.useMonthEnd),
           )
-        : parent.endDate
+        : requestedEndDate
 
     db.prepare(
       `UPDATE entries
@@ -316,4 +349,3 @@ export default defineEventHandler(async (event) => {
 
   return { ok: true }
 })
-
