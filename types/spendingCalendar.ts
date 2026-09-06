@@ -3,6 +3,7 @@ import type { BankKey } from '~/types/account'
 
 export type SpendingRecurrenceFilter =
   | 'all'
+  | 'purchased'
   | 'single'
   | 'installment'
   | 'fixed'

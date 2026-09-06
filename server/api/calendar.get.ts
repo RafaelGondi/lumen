@@ -3,6 +3,7 @@ import { buildSpendingCalendar } from '../utils/spendingCalendar'
 
 const FILTERS: SpendingRecurrenceFilter[] = [
   'all',
+  'purchased',
   'single',
   'installment',
   'fixed',

@@ -8,6 +8,7 @@ import type {
 } from '~/types/spendingCalendar'
 import { addMonthsScheduled, roundMoney } from '~/utils/dateMoney'
 import {
+  occurrenceByKey,
   occurrencesForCashMonth,
   occurrencesForCompetenceMonth,
 } from './occurrences'
@@ -96,6 +97,7 @@ function matchesFilter(
   filter: SpendingRecurrenceFilter,
 ) {
   if (filter === 'all') return true
+  if (filter === 'purchased') return recurrence !== 'fixed'
   return recurrence === filter
 }
 
@@ -296,14 +298,25 @@ function cardItemsForMonth(
 
   for (const parent of parents) {
     if (!matchesFilter(parent.recurrence, filter)) continue
-    for (const occurrenceMonth of candidateMonthsForCard(parent, month)) {
+    if (filter === 'purchased' && parent.date.slice(0, 7) !== month) continue
+    const candidateMonths =
+      filter === 'purchased'
+        ? [parent.date.slice(0, 7)]
+        : candidateMonthsForCard(parent, month)
+    for (const occurrenceMonth of candidateMonths) {
       const item = deriveCardOccurrence(
         parent,
         occurrenceMonth,
         exceptions,
         categories,
       )
+      if (item && filter === 'purchased') {
+        item.date = parent.date
+      }
       if (item && item.date >= start && item.date <= end) {
+        if (filter === 'purchased' && item.installmentCount) {
+          item.amount = roundMoney(item.amount * item.installmentCount)
+        }
         result.set(item.id, item)
       }
     }
@@ -325,6 +338,58 @@ function accountItemsForMonth(
         .all() as { entryId: number }[]
     ).map((row) => row.entryId),
   )
+
+  if (filter === 'purchased') {
+    const parents = db
+      .prepare(
+        `SELECT id, date
+         FROM entries
+         WHERE account_id IS NOT NULL
+           AND card_id IS NULL
+           AND type = 'expense'
+           AND recurrence IN ('single', 'installment')
+           AND substr(date, 1, 7) = ?`,
+      )
+      .all(month) as { id: number; date: string }[]
+
+    return parents.flatMap((parent): SpendingCalendarItem[] => {
+      if (invoicePaymentEntryIds.has(parent.id)) return []
+      const occurrence = occurrenceByKey(
+        db,
+        parent.id,
+        parent.date.slice(0, 7),
+      )
+      if (!occurrence || occurrence.type !== 'expense') return []
+
+      return [
+        {
+          id: occurrence.occurrenceKey,
+          source: 'account',
+          parentId: occurrence.parentId,
+          occurrenceMonth: occurrence.occurrenceMonth,
+          description: occurrence.description,
+          amount: occurrence.installmentCount
+            ? roundMoney(occurrence.amount * occurrence.installmentCount)
+            : occurrence.amount,
+          date: parent.date,
+          recurrence: occurrence.recurrence,
+          installmentIndex: occurrence.installmentIndex,
+          installmentCount: occurrence.installmentCount,
+          categoryId: occurrence.categoryId,
+          categoryName: occurrence.categoryName,
+          categoryColor: occurrence.categoryColor,
+          categoryIcon: occurrence.categoryIcon,
+          accountId: occurrence.accountId,
+          accountName: occurrence.accountName,
+          cardId: null,
+          cardName: null,
+          cardColor: null,
+          bankKey: null,
+          bankName: null,
+        },
+      ]
+    })
+  }
 
   const occurrences =
     dateBasis === 'competence'

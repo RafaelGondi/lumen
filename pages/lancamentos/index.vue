@@ -36,6 +36,7 @@ const selectedSupercategoryIds = ref<number[]>([])
 
 const filterOptions = [
   { value: 'all' as const, label: 'Tudo' },
+  { value: 'purchased' as const, label: 'Comprado no mês' },
   { value: 'single' as const, label: 'Avulso' },
   { value: 'installment' as const, label: 'Parcelas' },
   { value: 'fixed' as const, label: 'Fixo' },
@@ -111,6 +112,8 @@ const dimensionPlural = computed(() =>
 )
 
 const hasDimensionFilter = computed(() => selectedDimensionIds.value.length > 0)
+
+const isPurchaseView = computed(() => filter.value === 'purchased')
 
 watch(filterDimension, () => {
   selectedCategoryIds.value = []
@@ -268,13 +271,25 @@ function itemMeta(item: SpendingCalendarItem) {
   if (item.source === 'account' && item.accountName) parts.push(item.accountName)
   if (
     item.recurrence === 'installment' &&
-    item.installmentIndex &&
     item.installmentCount
   ) {
-    parts.push(`${item.installmentIndex}/${item.installmentCount}`)
+    if (isPurchaseView.value) {
+      parts.push(
+        `${item.installmentCount}x de ${formatCurrency(item.amount / item.installmentCount)}`,
+      )
+    } else if (item.installmentIndex) {
+      parts.push(`${item.installmentIndex}/${item.installmentCount}`)
+    }
   }
   if (item.recurrence === 'fixed') parts.push('Fixa')
   return parts.join(' · ')
+}
+
+function formatCurrency(value: number) {
+  return value.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  })
 }
 </script>
 
@@ -317,14 +332,20 @@ function itemMeta(item: SpendingCalendarItem) {
             </span>
             <div>
               <strong>{{ rangeLabel }}</strong>
-              <p>Clique em um dia para ver os detalhes</p>
+              <p>
+                {{
+                  isPurchaseView
+                    ? 'Avulsas e parceladas pela data em que foram compradas'
+                    : 'Clique em um dia para ver os detalhes'
+                }}
+              </p>
             </div>
           </div>
 
           <div class="calendar-board__filters">
             <UiSegmentedControl v-model="filter" :options="filterOptions" />
             <p v-if="report" class="calendar-board__counter">
-              Dias com gasto
+              {{ isPurchaseView ? 'Dias com compra' : 'Dias com gasto' }}
               <strong
                 >{{ report.stats.daysWithSpend }} /
                 {{ report.stats.daysInMonth }}</strong
@@ -379,7 +400,7 @@ function itemMeta(item: SpendingCalendarItem) {
               :style="cell ? dayStyle(cell) : undefined"
               :aria-label="
                 cell
-                  ? `${cell.day}: ${cell.count} gasto(s), total ${cell.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                  ? `${cell.day}: ${cell.count} ${isPurchaseView ? 'compra(s)' : 'gasto(s)'}, total ${cell.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
                   : undefined
               "
               :aria-pressed="cell ? selectedDate === cell.date : undefined"
@@ -415,7 +436,9 @@ function itemMeta(item: SpendingCalendarItem) {
               >
               <template v-else>—</template>
             </strong>
-            <p>dia com mais gasto</p>
+            <p>
+              {{ isPurchaseView ? 'dia com maior compra' : 'dia com mais gasto' }}
+            </p>
           </div>
         </div>
       </UiCard>
@@ -445,14 +468,16 @@ function itemMeta(item: SpendingCalendarItem) {
         </header>
 
         <div class="calendar-panel__total">
-          <p>Total do dia</p>
+          <p>{{ isPurchaseView ? 'Total comprado no dia' : 'Total do dia' }}</p>
           <strong><UiMoney :value="selectedDay.total" /></strong>
         </div>
 
         <UiEmptyState
           v-if="!selectedDay.items.length"
-          title="Nenhum gasto neste dia"
-          description="Selecione outro dia ou troque o filtro de recorrência."
+          :title="
+            isPurchaseView ? 'Nenhuma compra neste dia' : 'Nenhum gasto neste dia'
+          "
+          description="Selecione outro dia ou troque o modo de visualização."
         >
           <template #icon><CalendarDays /></template>
         </UiEmptyState>
@@ -892,7 +917,11 @@ function itemMeta(item: SpendingCalendarItem) {
   .calendar-board__filters :deep(.ui-segmented) {
     display: grid;
     width: 100%;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .calendar-board__filters :deep(.ui-segmented__option:nth-child(2)) {
+    grid-column: span 2;
   }
 
   .calendar-board__filters :deep(.ui-segmented__option) {
