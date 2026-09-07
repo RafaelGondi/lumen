@@ -335,16 +335,16 @@ function shortDate(date: string | null) {
             <section
               v-for="period in [
                 {
-                  key: 'current',
-                  label: report.monthLabel,
-                  date: selectedDay.currentDate,
-                  items: selectedDay.currentItems,
-                },
-                {
                   key: 'previous',
                   label: report.previousMonthLabel,
                   date: selectedDay.previousDate,
                   items: selectedDay.previousItems,
+                },
+                {
+                  key: 'current',
+                  label: report.monthLabel,
+                  date: selectedDay.currentDate,
+                  items: selectedDay.currentItems,
                 },
               ]"
               :key="period.key"
