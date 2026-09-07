@@ -7,6 +7,7 @@ import {
 
 const BANK_KEYS = new Set<string>([
   ...bankCatalog.map((bank) => bank.key),
+  'cash',
   'custom',
 ])
 
@@ -28,7 +29,7 @@ export function parseAccountPayload(body: unknown): AccountPayload {
     })
   }
 
-  const bankKey = (kind === 'cash' ? 'custom' : raw.bankKey) as BankKey
+  const bankKey = (kind === 'cash' ? 'cash' : raw.bankKey) as BankKey
 
   if (typeof bankKey !== 'string' || !BANK_KEYS.has(bankKey)) {
     throw createError({

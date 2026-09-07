@@ -7,6 +7,7 @@ export type BankKey =
   | 'btg'
   | 'mercadopago'
   | 'picpay'
+  | 'cash'
   | 'custom'
 
 export type AccountKind = 'bank' | 'cash'

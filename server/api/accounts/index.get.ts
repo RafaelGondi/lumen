@@ -18,7 +18,12 @@ export default defineEventHandler((): Account[] => {
     .prepare(
       `SELECT
          id,
-         kind,
+         CASE
+           WHEN bank_key = 'cash'
+             OR (bank_key = 'custom' AND bank_name = 'Dinheiro em espécie')
+           THEN 'cash'
+           ELSE 'bank'
+         END AS kind,
          bank_key AS bankKey,
          bank_name AS bankName,
          name,
