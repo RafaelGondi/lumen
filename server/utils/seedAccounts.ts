@@ -3,30 +3,35 @@ import { todayLocal } from './db'
 
 const seedAccounts = [
   {
+    kind: 'bank',
     bankKey: 'itau',
     bankName: 'Itaú',
     name: 'Itaú',
     color: '#ec7000',
   },
   {
+    kind: 'bank',
     bankKey: 'mercadopago',
     bankName: 'Mercado Pago',
     name: 'Mercado Pago',
     color: '#00bcff',
   },
   {
+    kind: 'bank',
     bankKey: 'inter',
     bankName: 'Inter',
     name: 'Inter',
     color: '#ff7a00',
   },
   {
+    kind: 'bank',
     bankKey: 'bradesco',
     bankName: 'Bradesco',
     name: 'Bradesco',
     color: '#cc092f',
   },
   {
+    kind: 'bank',
     bankKey: 'btg',
     bankName: 'BTG Pactual',
     name: 'BTG',
@@ -43,9 +48,9 @@ export function seedAccountsFromLegacy(db: Database.Database) {
 
     const insert = db.prepare(
       `INSERT INTO accounts (
-         bank_key, bank_name, name, initial_balance, color, created_at
+         kind, bank_key, bank_name, name, initial_balance, color, created_at
        ) VALUES (
-         @bankKey, @bankName, @name, 0, @color, @createdAt
+         @kind, @bankKey, @bankName, @name, 0, @color, @createdAt
        )`,
     )
 

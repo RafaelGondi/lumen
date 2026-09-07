@@ -505,12 +505,13 @@ async function save() {
       </div>
 
       <div class="entry-form__account">
-        <AccountsBankMark
+        <AccountsAccountMark
+          :kind="account.kind"
           :name="account.bankName"
           :color="account.color"
           :bank-key="account.bankKey"
         />
-        <div>
+        <div class="entry-form__account-identity">
           <p>
             {{
               isTransfer && isEditing && entry?.accountName
@@ -526,7 +527,7 @@ async function save() {
             Saldo atual {{ formatCurrency(transferAvailable) }}
           </span>
         </div>
-        <Lock aria-hidden="true" />
+        <Lock class="entry-form__account-lock" aria-hidden="true" />
       </div>
 
       <div v-if="isTransfer" class="entry-form__section">
@@ -915,17 +916,17 @@ async function save() {
   background: var(--color-surface-subtle);
 }
 
-.entry-form__account div {
+.entry-form__account-identity {
   min-width: 0;
   flex: 1;
 }
 
-.entry-form__account p {
+.entry-form__account-identity p {
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
 }
 
-.entry-form__account span {
+.entry-form__account-identity span {
   display: block;
   color: var(--color-ink-muted);
   font-size: var(--text-xs);
@@ -938,7 +939,7 @@ async function save() {
   font-weight: var(--weight-medium);
 }
 
-.entry-form__account svg {
+.entry-form__account-lock {
   width: 1rem;
   height: 1rem;
   color: var(--color-ink-muted);

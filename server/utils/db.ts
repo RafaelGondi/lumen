@@ -313,6 +313,7 @@ function migrate(database: Database.Database) {
 
     CREATE TABLE IF NOT EXISTS accounts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind TEXT NOT NULL DEFAULT 'bank' CHECK (kind IN ('bank', 'cash')),
       bank_key TEXT NOT NULL,
       bank_name TEXT NOT NULL,
       name TEXT NOT NULL COLLATE NOCASE,
@@ -368,6 +369,14 @@ function migrate(database: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_entries_account_date
       ON entries (account_id, date);
   `)
+
+  if (!hasColumn(database, 'accounts', 'kind')) {
+    database.exec(
+      `ALTER TABLE accounts
+       ADD COLUMN kind TEXT NOT NULL DEFAULT 'bank'
+       CHECK (kind IN ('bank', 'cash'))`,
+    )
+  }
 
   if (!hasColumn(database, 'entries', 'payment_state')) {
     database.exec(

@@ -1,7 +1,8 @@
-import type { Account, BankKey } from '~/types/account'
+import type { Account, AccountKind, BankKey } from '~/types/account'
 
 interface AccountRow {
   id: number
+  kind: AccountKind
   bankKey: BankKey
   bankName: string
   name: string
@@ -17,6 +18,7 @@ export default defineEventHandler((): Account[] => {
     .prepare(
       `SELECT
          id,
+         kind,
          bank_key AS bankKey,
          bank_name AS bankName,
          name,

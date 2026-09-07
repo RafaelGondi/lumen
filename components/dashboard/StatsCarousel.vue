@@ -87,6 +87,7 @@ watch(
         v-for="slide in desktopSlides"
         :key="`desktop-${slide.key}`"
         :stat="slide.stat"
+        :to="slide.key === 'current' ? '/contas' : undefined"
       >
         <template #icon>
           <component :is="slide.icon" />
@@ -108,7 +109,10 @@ watch(
           class="stats-carousel__slide"
           :aria-hidden="index !== activeIndex"
         >
-          <UiStatCard :stat="slide.stat">
+          <UiStatCard
+            :stat="slide.stat"
+            :to="slide.key === 'current' ? '/contas' : undefined"
+          >
             <template #icon>
               <component :is="slide.icon" />
             </template>

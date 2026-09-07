@@ -15,14 +15,17 @@ defineEmits<{
 <template>
   <NuxtLink :to="`/contas/${account.id}`" class="account-card">
     <div class="account-card__top">
-      <AccountsBankMark
+      <AccountsAccountMark
+        :kind="account.kind"
         :name="account.bankName"
         :color="account.color"
         :bank-key="account.bankKey"
       />
       <div class="account-card__identity">
         <p class="account-card__name">{{ account.name }}</p>
-        <p class="account-card__bank">{{ account.bankName }}</p>
+        <p class="account-card__bank">
+          {{ account.kind === 'cash' ? 'Dinheiro em espécie' : account.bankName }}
+        </p>
       </div>
       <ChevronRight class="account-card__chevron" aria-hidden="true" />
     </div>

@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import type { Account, AccountPayload, BankKey } from '~/types/account'
+import { Banknote, Landmark } from '@lucide/vue'
+import type {
+  Account,
+  AccountKind,
+  AccountPayload,
+  BankKey,
+} from '~/types/account'
+import { CASH_ACCOUNT_COLOR } from '~/utils/bankCatalog'
 
 const props = defineProps<{
   account: Account | null
@@ -11,53 +18,47 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { required: true })
 
+const kind = ref<AccountKind>('bank')
 const bankKey = ref<BankKey>('itau')
 const customBankName = ref('')
 const name = ref('')
-const initialBalanceText = ref('0,00')
 const errorMessage = ref('')
 const saving = ref(false)
+const {
+  amountText: initialBalanceText,
+  amountValue: initialBalanceValue,
+  handleAmountInput: handleInitialBalanceInput,
+  handleAmountKeydown: handleInitialBalanceKeydown,
+  setFromAmount: setInitialBalanceFromAmount,
+} = useMoneyField('0,00', { allowNegative: true })
 
 const isEditing = computed(() => props.account !== null)
 
 const selectedBankName = computed(() => {
+  if (kind.value === 'cash') return 'Dinheiro em espécie'
   if (bankKey.value === 'custom') return customBankName.value.trim()
   return bankByKey(bankKey.value)?.name ?? ''
 })
-
-function formatBalanceInput(value: number) {
-  return value.toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-}
-
-function parseBalanceInput(value: string): number | null {
-  const normalized = value
-    .trim()
-    .replace(/\s/g, '')
-    .replace(/R\$\s?/i, '')
-    .replace(/\./g, '')
-    .replace(',', '.')
-
-  if (!normalized) return 0
-
-  const amount = Number(normalized)
-  return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : null
-}
 
 watch(open, (value) => {
   if (!value) return
 
   errorMessage.value = ''
+  kind.value = props.account?.kind ?? 'bank'
   bankKey.value = props.account?.bankKey ?? 'itau'
   customBankName.value =
     props.account?.bankKey === 'custom' ? (props.account.bankName ?? '') : ''
   name.value = props.account?.name ?? ''
-  initialBalanceText.value = formatBalanceInput(
-    props.account?.initialBalance ?? 0,
-  )
+  setInitialBalanceFromAmount(props.account?.initialBalance ?? 0)
 })
+
+function selectKind(value: AccountKind) {
+  kind.value = value
+
+  if (value === 'cash' && !isEditing.value && !name.value.trim()) {
+    name.value = 'Caixa'
+  }
+}
 
 function selectBank(key: BankKey) {
   bankKey.value = key
@@ -80,7 +81,7 @@ async function save() {
     return
   }
 
-  const initialBalance = parseBalanceInput(initialBalanceText.value)
+  const initialBalance = initialBalanceValue.value
 
   if (initialBalance === null) {
     errorMessage.value = 'Saldo inicial inválido.'
@@ -88,6 +89,7 @@ async function save() {
   }
 
   const payload: AccountPayload = {
+    kind: kind.value,
     bankKey: bankKey.value,
     bankName,
     name: name.value.trim(),
@@ -126,6 +128,46 @@ async function save() {
   >
     <form class="account-form" @submit.prevent="save">
       <div class="account-form__section">
+        <p class="account-form__label">
+          Tipo de conta <span aria-hidden="true">*</span>
+        </p>
+        <div
+          class="account-form__kinds"
+          role="radiogroup"
+          aria-label="Tipo de conta"
+        >
+          <button
+            type="button"
+            role="radio"
+            class="account-form__kind"
+            :class="{ 'account-form__kind--active': kind === 'bank' }"
+            :aria-checked="kind === 'bank'"
+            @click="selectKind('bank')"
+          >
+            <Landmark aria-hidden="true" />
+            <span>
+              <strong>Conta bancária</strong>
+              <small>Banco ou carteira digital</small>
+            </span>
+          </button>
+          <button
+            type="button"
+            role="radio"
+            class="account-form__kind"
+            :class="{ 'account-form__kind--active': kind === 'cash' }"
+            :aria-checked="kind === 'cash'"
+            @click="selectKind('cash')"
+          >
+            <Banknote aria-hidden="true" />
+            <span>
+              <strong>Caixa</strong>
+              <small>Dinheiro em cédulas</small>
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="kind === 'bank'" class="account-form__section">
         <p class="account-form__label">
           Banco <span aria-hidden="true">*</span>
         </p>
@@ -172,7 +214,11 @@ async function save() {
       <UiTextField
         v-model="name"
         label="Nome da conta"
-        placeholder="Ex: Conta corrente, Conta salário..."
+        :placeholder="
+          kind === 'cash'
+            ? 'Ex: Caixa, Carteira...'
+            : 'Ex: Conta corrente, Conta salário...'
+        "
         required
       />
 
@@ -187,17 +233,28 @@ async function save() {
             type="text"
             inputmode="decimal"
             aria-label="Saldo inicial"
+            @keydown="handleInitialBalanceKeydown"
+            @input="handleInitialBalanceInput"
           />
         </div>
         <p class="account-form__hint">
-          O saldo inicial entra no saldo da conta. Receitas recebidas também somam ao saldo.
+          {{
+            kind === 'cash'
+              ? 'Informe quanto já existe em cédulas. Entradas e despesas em dinheiro atualizarão este saldo.'
+              : 'O saldo inicial entra no saldo da conta. Receitas recebidas também somam ao saldo.'
+          }}
         </p>
       </div>
 
       <div class="account-form__preview">
-        <AccountsBankMark
+        <AccountsAccountMark
+          :kind="kind"
           :name="selectedBankName || 'Banco'"
-          :color="resolveBankColor(bankKey, selectedBankName || 'Banco')"
+          :color="
+            kind === 'cash'
+              ? CASH_ACCOUNT_COLOR
+              : resolveBankColor(bankKey, selectedBankName || 'Banco')
+          "
           :bank-key="bankKey"
         />
         <div>
@@ -247,6 +304,53 @@ async function save() {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
+}
+
+.account-form__kinds {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.account-form__kind {
+  display: flex;
+  min-height: 4.25rem;
+  padding: var(--space-3);
+  align-items: center;
+  gap: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-form__kind svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.account-form__kind span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.account-form__kind strong {
+  color: var(--color-ink);
+  font-size: var(--text-xs);
+}
+
+.account-form__kind small {
+  color: var(--color-ink-muted);
+  font-size: 0.6875rem;
+}
+
+.account-form__kind--active {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
 }
 
 .account-form__bank {

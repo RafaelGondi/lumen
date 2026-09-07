@@ -1,5 +1,7 @@
 import type { BankKey, BankOption } from '~/types/account'
 
+export const CASH_ACCOUNT_COLOR = '#2f7d62'
+
 export const bankCatalog: BankOption[] = [
   { key: 'itau', name: 'Itaú', shortName: 'Itaú', color: '#ec7000' },
   { key: 'bradesco', name: 'Bradesco', shortName: 'Bradesco', color: '#cc092f' },

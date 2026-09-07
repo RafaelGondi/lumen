@@ -368,7 +368,7 @@ function entryMeta(entry: EntryOccurrence) {
     <PageHeading
       eyebrow="Financeiro / Contas"
       :title="account.name"
-      :description="account.bankName"
+      :description="account.kind === 'cash' ? 'Dinheiro em espécie' : account.bankName"
     >
       <template #actions>
         <UiButton variant="secondary" @click="navigateTo('/contas')">
@@ -385,14 +385,17 @@ function entryMeta(entry: EntryOccurrence) {
     <div class="account-overview">
       <section class="account-hero" :style="heroStyle" aria-label="Resumo da conta">
         <div class="account-hero__top">
-          <AccountsBankMark
+          <AccountsAccountMark
+            :kind="account.kind"
             :name="account.bankName"
             :color="account.color"
             :bank-key="account.bankKey"
             size="lg"
           />
           <div class="account-hero__identity">
-            <p class="account-hero__bank">{{ account.bankName }}</p>
+            <p class="account-hero__bank">
+              {{ account.kind === 'cash' ? 'Dinheiro em espécie' : account.bankName }}
+            </p>
             <p class="account-hero__name">{{ account.name }}</p>
           </div>
         </div>

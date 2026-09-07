@@ -9,6 +9,8 @@ export type BankKey =
   | 'picpay'
   | 'custom'
 
+export type AccountKind = 'bank' | 'cash'
+
 export interface BankOption {
   key: BankKey
   name: string
@@ -18,6 +20,7 @@ export interface BankOption {
 
 export interface Account {
   id: number
+  kind: AccountKind
   bankKey: BankKey
   bankName: string
   name: string
@@ -28,6 +31,7 @@ export interface Account {
 }
 
 export interface AccountPayload {
+  kind: AccountKind
   bankKey: BankKey
   bankName: string
   name: string

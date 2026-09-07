@@ -33,7 +33,7 @@ async function removeAccount(account: Account) {
     <PageHeading
       eyebrow="Financeiro / Contas"
       title="Contas"
-      description="Suas contas bancárias e carteiras digitais."
+      description="Suas contas bancárias, carteiras digitais e dinheiro em espécie."
     >
       <template #actions>
         <UiButton @click="openDrawer(null)">
@@ -74,7 +74,7 @@ async function removeAccount(account: Account) {
       class="accounts-list"
       :items="accounts"
       :get-key="(account) => account.id"
-      aria-label="Contas bancárias"
+      aria-label="Contas"
       dots-label="Contas"
     >
       <template #default="{ item: account }">

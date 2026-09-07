@@ -28,15 +28,23 @@ export function moneyFieldFromAmount(amount: number | null | undefined) {
   return maskBrl(String(Math.round(amount * 100)))
 }
 
-export function useMoneyField(initial = '0,00') {
+export function useMoneyField(
+  initial = '0,00',
+  options: { allowNegative?: boolean } = {},
+) {
   const amountText = ref(initial)
 
   function amountDigits(value: string) {
     return value.replace(/\D/g, '').replace(/^0+/, '')
   }
 
-  function setMaskedAmount(input: HTMLInputElement, digits: string) {
-    const masked = maskBrl(digits)
+  function setMaskedAmount(
+    input: HTMLInputElement,
+    digits: string,
+    negative = false,
+  ) {
+    const base = maskBrl(digits)
+    const masked = options.allowNegative && negative && digits ? `-${base}` : base
     amountText.value = masked
     input.value = masked
     input.setSelectionRange(masked.length, masked.length)
@@ -51,8 +59,19 @@ export function useMoneyField(initial = '0,00') {
       event.preventDefault()
       const current = allSelected ? '' : amountDigits(amountText.value)
       if (current.length < 17) {
-        setMaskedAmount(input, `${current}${event.key}`)
+        setMaskedAmount(
+          input,
+          `${current}${event.key}`,
+          !allSelected && amountText.value.startsWith('-'),
+        )
       }
+      return
+    }
+
+    if (options.allowNegative && event.key === '-') {
+      event.preventDefault()
+      const digits = amountDigits(amountText.value)
+      setMaskedAmount(input, digits, !amountText.value.startsWith('-'))
       return
     }
 
@@ -60,17 +79,26 @@ export function useMoneyField(initial = '0,00') {
       event.preventDefault()
       const current = allSelected ? '' : amountDigits(amountText.value)
       const next = current.slice(0, -1)
-      setMaskedAmount(input, next || '0')
+      setMaskedAmount(
+        input,
+        next || '0',
+        !allSelected && amountText.value.startsWith('-'),
+      )
     }
   }
 
   function handleAmountInput(event: Event) {
     const input = event.target as HTMLInputElement
-    setMaskedAmount(input, amountDigits(input.value))
+    setMaskedAmount(
+      input,
+      amountDigits(input.value),
+      input.value.trim().startsWith('-'),
+    )
   }
 
   function setFromAmount(amount: number | null | undefined) {
-    amountText.value = moneyFieldFromAmount(amount)
+    const value = moneyFieldFromAmount(Math.abs(amount ?? 0))
+    amountText.value = options.allowNegative && (amount ?? 0) < 0 ? `-${value}` : value
   }
 
   const amountValue = computed(() => parseMoneyInput(amountText.value))

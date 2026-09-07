@@ -6,9 +6,9 @@ export default defineEventHandler(async (event) => {
     const result = db
       .prepare(
         `INSERT INTO accounts (
-           bank_key, bank_name, name, initial_balance, color, created_at
+           kind, bank_key, bank_name, name, initial_balance, color, created_at
          ) VALUES (
-           @bankKey, @bankName, @name, @initialBalance, @color, @createdAt
+           @kind, @bankKey, @bankName, @name, @initialBalance, @color, @createdAt
          )`,
       )
       .run({

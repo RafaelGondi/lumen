@@ -2,11 +2,13 @@
 import type { FinancialStat } from '~/types/finance'
 import { AKOMA_ACCENT, AKOMA_MOOD } from '~/utils/theme'
 
-defineProps<{
+const props = defineProps<{
   stat: FinancialStat
+  to?: string
 }>()
 
 const { formatCurrency } = useCurrency()
+const nuxtLinkComponent = resolveComponent('NuxtLink')
 
 /**
  * O Akoma escopa tema por atributo, mas os seletores são compostos
@@ -22,41 +24,68 @@ const darkSurfaceAttrs = {
 </script>
 
 <template>
-  <UiCard
-    class="stat-card"
-    :class="`stat-card--${stat.tone}`"
-    v-bind="stat.tone === 'featured' ? darkSurfaceAttrs : {}"
-    padding="md"
+  <component
+    :is="props.to ? nuxtLinkComponent : 'div'"
+    class="stat-card__wrapper"
+    :class="{ 'stat-card__wrapper--link': props.to }"
+    :to="props.to"
+    :aria-label="props.to ? `Ver contas — ${stat.label}` : undefined"
   >
-    <div class="stat-card__header">
-      <p>{{ stat.label }}</p>
-      <span class="stat-card__icon" aria-hidden="true">
-        <slot name="icon" />
-      </span>
-    </div>
-
-    <p class="stat-card__value">
-      <UiMoney :value="stat.value" />
-    </p>
-    <p class="stat-card__support">{{ stat.supportingText }}</p>
-
-    <dl class="stat-card__breakdown">
-      <div v-for="item in stat.breakdown" :key="item.label">
-        <dt>{{ item.label }}</dt>
-        <dd
-          class="numeric"
-          :class="item.tone ? `stat-card__detail--${item.tone}` : undefined"
-        >
-          {{ formatCurrency(item.value) }}
-        </dd>
+    <UiCard
+      class="stat-card"
+      :class="`stat-card--${stat.tone}`"
+      v-bind="stat.tone === 'featured' ? darkSurfaceAttrs : {}"
+      padding="md"
+      :interactive="Boolean(props.to)"
+    >
+      <div class="stat-card__header">
+        <p>{{ stat.label }}</p>
+        <span class="stat-card__icon" aria-hidden="true">
+          <slot name="icon" />
+        </span>
       </div>
-    </dl>
-  </UiCard>
+
+      <p class="stat-card__value">
+        <UiMoney :value="stat.value" />
+      </p>
+      <p class="stat-card__support">{{ stat.supportingText }}</p>
+
+      <dl class="stat-card__breakdown">
+        <div v-for="item in stat.breakdown" :key="item.label">
+          <dt>{{ item.label }}</dt>
+          <dd
+            class="numeric"
+            :class="item.tone ? `stat-card__detail--${item.tone}` : undefined"
+          >
+            {{ formatCurrency(item.value) }}
+          </dd>
+        </div>
+      </dl>
+    </UiCard>
+  </component>
 </template>
 
 <style scoped>
+.stat-card__wrapper {
+  display: block;
+  height: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+
+.stat-card__wrapper--link {
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.stat-card__wrapper--link:focus-visible {
+  outline: 2px solid var(--color-focus-ring, var(--color-brand));
+  outline-offset: 3px;
+}
+
 .stat-card {
   position: relative;
+  height: 100%;
   overflow: hidden;
 }
 

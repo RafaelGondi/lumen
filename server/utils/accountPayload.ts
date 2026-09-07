@@ -1,5 +1,9 @@
-import type { AccountPayload, BankKey } from '~/types/account'
-import { bankCatalog, resolveBankColor } from '~/utils/bankCatalog'
+import type { AccountKind, AccountPayload, BankKey } from '~/types/account'
+import {
+  bankCatalog,
+  CASH_ACCOUNT_COLOR,
+  resolveBankColor,
+} from '~/utils/bankCatalog'
 
 const BANK_KEYS = new Set<string>([
   ...bankCatalog.map((bank) => bank.key),
@@ -15,7 +19,16 @@ export function parseAccountPayload(body: unknown): AccountPayload {
   }
 
   const raw = body as Record<string, unknown>
-  const bankKey = raw.bankKey as BankKey
+  const kind = (raw.kind ?? 'bank') as AccountKind
+
+  if (kind !== 'bank' && kind !== 'cash') {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Tipo de conta inválido.',
+    })
+  }
+
+  const bankKey = (kind === 'cash' ? 'custom' : raw.bankKey) as BankKey
 
   if (typeof bankKey !== 'string' || !BANK_KEYS.has(bankKey)) {
     throw createError({
@@ -25,7 +38,11 @@ export function parseAccountPayload(body: unknown): AccountPayload {
   }
 
   const bankName =
-    typeof raw.bankName === 'string' ? raw.bankName.trim() : ''
+    kind === 'cash'
+      ? 'Dinheiro em espécie'
+      : typeof raw.bankName === 'string'
+        ? raw.bankName.trim()
+        : ''
 
   if (!bankName || bankName.length > 60) {
     throw createError({
@@ -56,6 +73,7 @@ export function parseAccountPayload(body: unknown): AccountPayload {
   }
 
   return {
+    kind,
     bankKey,
     bankName,
     name,
@@ -77,5 +95,6 @@ export function parseAccountIdParam(value: string | undefined): number {
 }
 
 export function accountColorFor(payload: AccountPayload): string {
+  if (payload.kind === 'cash') return CASH_ACCOUNT_COLOR
   return resolveBankColor(payload.bankKey, payload.bankName)
 }

@@ -7,7 +7,8 @@ export default defineEventHandler(async (event) => {
     const result = db
       .prepare(
         `UPDATE accounts
-         SET bank_key = @bankKey,
+         SET kind = @kind,
+             bank_key = @bankKey,
              bank_name = @bankName,
              name = @name,
              initial_balance = @initialBalance,
