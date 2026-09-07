@@ -5,6 +5,7 @@ const tabs = [
   { label: 'Origem e destino', to: '/relatorios/origem-destino' },
   { label: 'Evolução', to: '/relatorios/evolucao' },
   { label: 'Comparação', to: '/relatorios/comparacao' },
+  { label: 'Ritmo de gastos', to: '/relatorios/ritmo-gastos' },
   { label: 'Projeção', to: '/relatorios/projecao' },
   { label: 'Por categoria', to: '/relatorios/categorias' },
 ]
