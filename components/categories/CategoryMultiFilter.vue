@@ -32,6 +32,11 @@ const selectedIds = computed(() => new Set(model.value))
 const selectedOptions = computed(() =>
   props.options.filter((option) => selectedIds.value.has(option.id)),
 )
+const allSelected = computed(
+  () =>
+    props.options.length > 0 &&
+    props.options.every((option) => selectedIds.value.has(option.id)),
+)
 const filteredOptions = computed(() => {
   const term = query.value.trim().toLocaleLowerCase('pt-BR')
   if (!term) return props.options
@@ -62,6 +67,10 @@ function toggleOption(optionId: number) {
 
 function clearSelection() {
   model.value = []
+}
+
+function selectAll() {
+  model.value = props.options.map((option) => option.id)
 }
 
 function onDocumentPointerDown(event: PointerEvent) {
@@ -142,14 +151,21 @@ onBeforeUnmount(() =>
       <div class="category-filter__menu-meta">
         <span>
           {{
-            model.length
+            allSelected
+              ? `Todas as ${plural.toLocaleLowerCase('pt-BR')} selecionadas`
+              : model.length
               ? `${model.length} selecionada${model.length === 1 ? '' : 's'}`
               : 'Selecione uma ou mais'
           }}
         </span>
-        <button v-if="model.length" type="button" @click="clearSelection">
-          Limpar seleção
-        </button>
+        <div class="category-filter__menu-actions">
+          <button v-if="!allSelected" type="button" @click="selectAll">
+            Selecionar todas
+          </button>
+          <button v-if="model.length" type="button" @click="clearSelection">
+            Limpar
+          </button>
+        </div>
       </div>
 
       <div class="category-filter__options">
@@ -185,7 +201,20 @@ onBeforeUnmount(() =>
 
     <div v-if="selectedOptions.length" class="category-filter__selected">
       <button
+        v-if="allSelected"
+        type="button"
+        :aria-label="`Remover filtro de todas as ${plural.toLocaleLowerCase('pt-BR')}`"
+        @click="clearSelection"
+      >
+        <span class="category-filter__all-icon" aria-hidden="true">
+          <Check />
+        </span>
+        <span>Todas as {{ plural.toLocaleLowerCase('pt-BR') }}</span>
+        <X aria-hidden="true" />
+      </button>
+      <button
         v-for="option in selectedOptions"
+        v-else
         :key="option.id"
         type="button"
         :aria-label="`Remover filtro ${option.name}`"
@@ -271,7 +300,7 @@ onBeforeUnmount(() =>
 }
 
 .category-filter__clear,
-.category-filter__menu-meta button {
+.category-filter__menu-actions button {
   border: 0;
   background: transparent;
   color: var(--color-brand-ink);
@@ -279,6 +308,13 @@ onBeforeUnmount(() =>
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
   cursor: pointer;
+}
+
+.category-filter__menu-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .category-filter__menu {
@@ -427,6 +463,22 @@ onBeforeUnmount(() =>
   width: 0.8rem;
   height: 0.8rem;
   color: var(--color-ink-muted);
+}
+
+.category-filter__all-icon {
+  display: grid;
+  width: 1.25rem;
+  height: 1.25rem;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--color-brand);
+  color: var(--color-white);
+}
+
+.category-filter__all-icon svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  stroke-width: 2.5;
 }
 
 @media (max-width: 720px) {

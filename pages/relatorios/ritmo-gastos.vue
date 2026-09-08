@@ -393,14 +393,17 @@ function shortDate(date: string | null) {
 }
 
 .spending-pace__notice {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
   color: var(--color-ink-secondary);
   font-size: var(--text-xs);
 }
 
-.spending-pace__notice > svg {
+.spending-pace__notice :deep(.ak-card__body) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.spending-pace__notice :deep(.ak-card__body > svg) {
   width: 1rem;
   height: 1rem;
   flex: 0 0 auto;
@@ -636,7 +639,7 @@ function shortDate(date: string | null) {
     grid-template-columns: 1fr;
   }
 
-  .spending-pace__notice {
+  .spending-pace__notice :deep(.ak-card__body) {
     align-items: flex-start;
   }
 }

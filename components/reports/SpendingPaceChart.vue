@@ -42,7 +42,7 @@ const emit = defineEmits<{
 const wrapRef = ref<HTMLElement | null>(null)
 const colors = ref({
   current: '#3f8f77',
-  previous: '#89938d',
+  previous: '#527dab',
   grid: 'rgba(33,49,41,.1)',
   muted: '#67736b',
   surface: '#ffffff',
@@ -61,7 +61,7 @@ onMounted(() => {
     style.getPropertyValue(token).trim() || fallback
   colors.value = {
     current: read('--color-positive', colors.value.current),
-    previous: read('--color-ink-muted', colors.value.previous),
+    previous: read('--color-brand', colors.value.previous),
     grid: read('--color-border', colors.value.grid),
     muted: read('--color-ink-muted', colors.value.muted),
     surface: read('--color-surface', colors.value.surface),
@@ -71,6 +71,22 @@ onMounted(() => {
 const lineData = computed<ChartData<'line'>>(() => ({
   labels: chartDays.value.map((day) => String(day.day)),
   datasets: [
+    {
+      label: props.previousLabel,
+      data: chartDays.value.map((day) => day.previousCumulative),
+      borderColor: colors.value.previous,
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderDash: [6, 5],
+      cubicInterpolationMode: 'monotone',
+      pointRadius: chartDays.value.map((day) =>
+        day.day === props.selectedDay ? 6 : day.previousDaily ? 2 : 0,
+      ),
+      pointHoverRadius: 5,
+      pointBackgroundColor: colors.value.previous,
+      pointBorderColor: colors.value.surface,
+      pointBorderWidth: 1,
+    },
     {
       label: props.currentLabel,
       data: chartDays.value.map((day) => day.currentCumulative),
@@ -88,22 +104,6 @@ const lineData = computed<ChartData<'line'>>(() => ({
       pointBorderWidth: 1.5,
       spanGaps: false,
     },
-    {
-      label: props.previousLabel,
-      data: chartDays.value.map((day) => day.previousCumulative),
-      borderColor: colors.value.previous,
-      backgroundColor: 'transparent',
-      borderWidth: 2,
-      borderDash: [6, 5],
-      cubicInterpolationMode: 'monotone',
-      pointRadius: chartDays.value.map((day) =>
-        day.day === props.selectedDay ? 6 : day.previousDaily ? 2 : 0,
-      ),
-      pointHoverRadius: 5,
-      pointBackgroundColor: colors.value.previous,
-      pointBorderColor: colors.value.surface,
-      pointBorderWidth: 1,
-    },
   ],
 }))
 
@@ -111,10 +111,10 @@ const barData = computed<ChartData<'bar'>>(() => ({
   labels: chartDays.value.map((day) => String(day.day)),
   datasets: [
     {
-      label: props.currentLabel,
-      data: chartDays.value.map((day) => day.currentDaily),
-      backgroundColor: colors.value.current,
-      borderColor: colors.value.current,
+      label: props.previousLabel,
+      data: chartDays.value.map((day) => day.previousDaily),
+      backgroundColor: colors.value.previous,
+      borderColor: colors.value.previous,
       borderWidth: chartDays.value.map((day) =>
         day.day === props.selectedDay ? 3 : 0,
       ),
@@ -122,10 +122,10 @@ const barData = computed<ChartData<'bar'>>(() => ({
       maxBarThickness: 18,
     },
     {
-      label: props.previousLabel,
-      data: chartDays.value.map((day) => day.previousDaily),
-      backgroundColor: colors.value.previous,
-      borderColor: colors.value.previous,
+      label: props.currentLabel,
+      data: chartDays.value.map((day) => day.currentDaily),
+      backgroundColor: colors.value.current,
+      borderColor: colors.value.current,
       borderWidth: chartDays.value.map((day) =>
         day.day === props.selectedDay ? 3 : 0,
       ),
