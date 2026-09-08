@@ -413,7 +413,7 @@ export function buildDashboardMonth(monthKey: string): DashboardMonth {
       categoryColor: entry.categoryColor,
       bankKey: null,
       bankColor: null,
-      linkTo: null,
+      linkTo: `/contas/${entry.accountId}?month=${monthKey}`,
     }))
 
   const now = new Date()
