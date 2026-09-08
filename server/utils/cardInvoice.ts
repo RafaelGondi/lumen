@@ -19,6 +19,11 @@ import {
   loadCardInvoicePaymentsMap,
   loadPaidTotalsForCards,
 } from './cardInvoicePayment'
+import {
+  loadCardInvoiceRewards,
+  loadCardInvoiceRewardsMap,
+  loadRewardsForCards,
+} from './cardInvoiceReward'
 
 const MONTH_SHORT = [
   'Jan',
@@ -191,6 +196,7 @@ function invoiceMonthAmount(
   card: Card,
   month: string,
   adjustments: Map<string, number>,
+  rewards: Map<string, number>,
   payments: Map<string, { totalPaid: number }>,
 ) {
   const payment = payments.get(month)
@@ -199,7 +205,14 @@ function invoiceMonthAmount(
     (sum, entry) => sum + entry.amount,
     0,
   )
-  return roundMoney(entriesSubtotal + (adjustments.get(month) ?? 0))
+  return roundMoney(
+    Math.max(
+      0,
+      entriesSubtotal +
+        (adjustments.get(month) ?? 0) -
+        (rewards.get(month) ?? 0),
+    ),
+  )
 }
 
 function buildProjection(
@@ -208,13 +221,21 @@ function buildProjection(
   focusMonth: string,
 ): CardInvoiceProjectionMonth[] {
   const adjustments = loadCardInvoiceAdjustmentsMap(db, card.id)
+  const rewards = loadCardInvoiceRewardsMap(db, card.id)
   const payments = loadCardInvoicePaymentsMap(db, card.id)
   const months = Array.from({ length: 12 }, (_, index) => {
     const month = shiftMonth(focusMonth, index - 1)
     return {
       month,
       shortLabel: MONTH_SHORT[monthParts(month).month - 1]!,
-      amount: invoiceMonthAmount(db, card, month, adjustments, payments),
+      amount: invoiceMonthAmount(
+        db,
+        card,
+        month,
+        adjustments,
+        rewards,
+        payments,
+      ),
     }
   })
   return markResidualMonths(months)
@@ -311,6 +332,10 @@ export function buildConsolidatedCardsProjection(
     db,
     mapped.map((card) => card.id),
   )
+  const rewards = loadRewardsForCards(
+    db,
+    mapped.map((card) => card.id),
+  )
   const paidTotals = loadPaidTotalsForCards(
     db,
     mapped.map((card) => card.id),
@@ -336,7 +361,12 @@ export function buildConsolidatedCardsProjection(
         (entrySum, entry) => entrySum + entry.amount,
         0,
       )
-      amount += entriesSubtotal + (adjustments.get(`${card.id}:${month}`) ?? 0)
+      amount += Math.max(
+        0,
+        entriesSubtotal +
+          (adjustments.get(`${card.id}:${month}`) ?? 0) -
+          (rewards.get(`${card.id}:${month}`) ?? 0),
+      )
     }
     return {
       month,
@@ -400,6 +430,10 @@ export function buildCardInvoice(
 ): CardInvoiceDetail {
   const entries = invoiceEntries(db, card, month)
   const payment = loadCardInvoicePayment(db, card.id, month)
+  const rewards = loadCardInvoiceRewards(db, card.id, month)
+  const rewardsTotal = roundMoney(
+    rewards.reduce((sum, reward) => sum + reward.creditAmount, 0),
+  )
   const today = todayLocal()
 
   let entriesSubtotal: number
@@ -434,7 +468,9 @@ export function buildCardInvoice(
     const adjustmentRow = loadCardInvoiceAdjustment(db, card.id, month)
     adjustment = adjustmentRow?.amount ?? 0
     adjustmentNotes = adjustmentRow?.notes ?? null
-    total = roundMoney(entriesSubtotal + adjustment)
+    total = roundMoney(
+      Math.max(0, entriesSubtotal + adjustment - rewardsTotal),
+    )
     const open = openInvoiceStatus(month, card.dueDay, today)
     status = open.status
     statusLabel = open.statusLabel
@@ -464,6 +500,8 @@ export function buildCardInvoice(
     entriesSubtotal,
     adjustment,
     adjustmentNotes,
+    rewards,
+    rewardsTotal,
     total,
     creditLimit: card.creditLimit,
     usedAmount: committed,
@@ -501,6 +539,7 @@ export function cardUsageSummary(
   }
   const paidInvoices = loadCardInvoicePaymentsMap(db, card.id)
   const cardAdjustments = loadCardInvoiceAdjustmentsMap(db, card.id)
+  const cardRewards = loadCardInvoiceRewardsMap(db, card.id)
   /*
    * A janela é montada aqui, e não filtrando `buildCardInvoice().projection`:
    * aquela começa um mês antes do foco, então o filtro `>= fromMonth` deixava
@@ -519,6 +558,7 @@ export function cardUsageSummary(
         withPlaceholder,
         month,
         cardAdjustments,
+        cardRewards,
         paidInvoices,
       ),
     }))

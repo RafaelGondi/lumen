@@ -95,7 +95,11 @@ export interface CardInvoiceDetail {
   /** Delta da fatura (+ débito, − crédito). */
   adjustment: number
   adjustmentNotes: string | null
-  /** entriesSubtotal + adjustment */
+  /** Créditos de cashback/pontos registrados nesta fatura. */
+  rewards: CardInvoiceReward[]
+  /** Soma positiva dos créditos em `rewards`. */
+  rewardsTotal: number
+  /** entriesSubtotal + adjustment - rewardsTotal */
   total: number
   creditLimit: number
   usedAmount: number
@@ -116,6 +120,26 @@ export interface CardInvoiceDetail {
   supercategories: CardInvoiceCategorySpend[]
   recurrences: CardInvoiceCategorySpend[]
   entries: CardInvoiceEntry[]
+}
+
+export interface CardInvoiceReward {
+  id: number
+  program: string
+  pointsUsed: number
+  creditAmount: number
+  /** YYYY-MM-DD */
+  creditedAt: string
+  notes: string | null
+}
+
+export interface CardInvoiceRewardPayload {
+  month: string
+  program: string
+  pointsUsed: number
+  creditAmount: number
+  /** YYYY-MM-DD */
+  creditedAt: string
+  notes: string | null
 }
 
 export interface CardInvoicePaymentInfo {

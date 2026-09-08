@@ -427,6 +427,7 @@ function migrate(database: Database.Database) {
   migrateEntryDestinationAccount(database)
   migrateExpandedSeries(database)
   migrateCardInvoiceAdjustments(database)
+  migrateCardInvoiceRewards(database)
   migrateCardInvoicePayments(database)
   migrateSpendingLimits(database)
   migrateProjectionSnapshots(database)
@@ -590,6 +591,26 @@ function migrateCardInvoiceAdjustments(database: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_card_invoice_adj_card_month
       ON card_invoice_adjustments (card_id, invoice_month);
+  `)
+}
+
+function migrateCardInvoiceRewards(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS card_invoice_rewards (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      invoice_month TEXT NOT NULL,
+      program TEXT NOT NULL,
+      points_used INTEGER NOT NULL CHECK (points_used > 0),
+      credit_amount REAL NOT NULL CHECK (credit_amount > 0),
+      credited_at TEXT NOT NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_card_invoice_rewards_card_month
+      ON card_invoice_rewards (card_id, invoice_month, credited_at, id);
   `)
 }
 

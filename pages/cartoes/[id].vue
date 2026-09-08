@@ -2,6 +2,7 @@
 import {
   ArrowLeft,
   ChevronDown,
+  Coins,
   CreditCard,
   PieChart,
   Plus,
@@ -61,6 +62,7 @@ const expandedCategoryKeys = ref<string[]>([])
 const invoiceSectionRef = ref<HTMLElement | null>(null)
 const expenseDrawerOpen = ref(false)
 const adjustmentDrawerOpen = ref(false)
+const rewardDrawerOpen = ref(false)
 const paymentDrawerOpen = ref(false)
 const deleteDialogOpen = ref(false)
 const pendingDeleteExpense = ref<CardInvoiceDetail['entries'][number] | null>(
@@ -107,6 +109,17 @@ function isGroupedSortKey(
 function todayIsoLocal() {
   const today = new Date()
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  })
+}
+
+function rewardValuePerThousand(points: number, credit: number) {
+  return points > 0 ? roundMoney((credit / points) * 1000) : 0
 }
 
 function setMonthKey(key: string) {
@@ -249,6 +262,41 @@ const filteredBase = computed(() => {
   })
 })
 
+const filteredRewards = computed(() => {
+  if (entryTypeFilter.value !== 'all') return []
+  const rewards = invoice.value?.rewards ?? []
+  const term = searchQuery.value.trim().toLowerCase()
+  if (!term) return rewards
+
+  return rewards.filter((reward) => {
+    const amount = reward.creditAmount.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+    const points = reward.pointsUsed.toLocaleString('pt-BR')
+    return (
+      'cashback com pontos'.includes(term) ||
+      reward.program.toLowerCase().includes(term) ||
+      (reward.notes?.toLowerCase().includes(term) ?? false) ||
+      amount.includes(term) ||
+      points.includes(term)
+    )
+  })
+})
+
+const visibleItemCount = computed(
+  () => filteredEntries.value.length + filteredRewards.value.length,
+)
+
+const filteredRewardsTotal = computed(() =>
+  roundMoney(
+    filteredRewards.value.reduce(
+      (total, reward) => total + reward.creditAmount,
+      0,
+    ),
+  ),
+)
+
 const categoryGroups = computed(() =>
   sortBy.value === 'supercategory'
     ? groupEntriesBySupercategory(filteredBase.value)
@@ -271,13 +319,19 @@ const filteredEntries = computed(() => {
 })
 
 type InvoiceEntry = CardInvoiceDetail['entries'][number]
+type InvoiceReward = CardInvoiceDetail['rewards'][number]
+type DateGroupItem =
+  | { key: string; kind: 'expense'; entry: InvoiceEntry }
+  | { key: string; kind: 'reward'; reward: InvoiceReward }
+
+type InvoiceListItem = DateGroupItem
 
 type DateEntryGroup = {
   key: string
   label: string
   weekday: string
   total: number
-  entries: InvoiceEntry[]
+  items: DateGroupItem[]
 }
 
 function entryPurchaseDate(entry: InvoiceEntry) {
@@ -308,7 +362,7 @@ const dateGroups = computed<DateEntryGroup[]>(() => {
     const key = entryPurchaseDate(entry)
     const current = groups.get(key)
     if (current) {
-      current.entries.push(entry)
+      current.items.push({ key: `expense:${entry.id}`, kind: 'expense', entry })
       current.total = roundMoney(current.total + entry.amount)
       continue
     }
@@ -318,11 +372,69 @@ const dateGroups = computed<DateEntryGroup[]>(() => {
       key,
       ...formatted,
       total: roundMoney(entry.amount),
-      entries: [entry],
+      items: [{ key: `expense:${entry.id}`, kind: 'expense', entry }],
     })
   }
 
-  return [...groups.values()]
+  for (const reward of filteredRewards.value) {
+    const key = reward.creditedAt
+    const current = groups.get(key)
+    if (current) {
+      current.items.push({ key: `reward:${reward.id}`, kind: 'reward', reward })
+      current.total = roundMoney(current.total - reward.creditAmount)
+      continue
+    }
+
+    const formatted = formatDateGroup(key)
+    groups.set(key, {
+      key,
+      ...formatted,
+      total: roundMoney(-reward.creditAmount),
+      items: [{ key: `reward:${reward.id}`, kind: 'reward', reward }],
+    })
+  }
+
+  return [...groups.values()].sort((a, b) =>
+    sortDir.value === 'asc' ? a.key.localeCompare(b.key) : b.key.localeCompare(a.key),
+  )
+})
+
+const sortedListItems = computed<InvoiceListItem[]>(() => {
+  const items: InvoiceListItem[] = [
+    ...filteredEntries.value.map((entry) => ({
+      key: `expense:${entry.id}`,
+      kind: 'expense' as const,
+      entry,
+    })),
+    ...filteredRewards.value.map((reward) => ({
+      key: `reward:${reward.id}`,
+      kind: 'reward' as const,
+      reward,
+    })),
+  ]
+  const factor = sortDir.value === 'asc' ? 1 : -1
+
+  return items.sort((left, right) => {
+    const leftName =
+      left.kind === 'expense' ? left.entry.description : 'Cashback com pontos'
+    const rightName =
+      right.kind === 'expense' ? right.entry.description : 'Cashback com pontos'
+    const leftAmount =
+      left.kind === 'expense' ? left.entry.amount : left.reward.creditAmount
+    const rightAmount =
+      right.kind === 'expense' ? right.entry.amount : right.reward.creditAmount
+    const leftDate =
+      left.kind === 'expense' ? entryPurchaseDate(left.entry) : left.reward.creditedAt
+    const rightDate =
+      right.kind === 'expense' ? entryPurchaseDate(right.entry) : right.reward.creditedAt
+
+    const primary =
+      sortBy.value === 'amount'
+        ? leftAmount - rightAmount
+        : leftName.localeCompare(rightName, 'pt-BR', { sensitivity: 'base' })
+    if (primary !== 0) return primary * factor
+    return rightDate.localeCompare(leftDate)
+  })
 })
 
 watch(sortBy, (key) => {
@@ -595,14 +707,39 @@ async function onPaymentSaved() {
               <UiMoney :value="invoice.total" />
             </p>
             <div
-              v-if="invoice.adjustment !== 0"
+              v-if="invoice.adjustment !== 0 || invoice.rewardsTotal > 0"
               class="card-invoice__adjustment"
             >
-              <div class="card-invoice__adjustment-row">
+              <div
+                v-if="invoice.adjustment !== 0"
+                class="card-invoice__adjustment-row"
+              >
                 <span>Calculado</span>
                 <strong>
                   <UiMoney :value="invoice.entriesSubtotal" />
                 </strong>
+              </div>
+              <div
+                v-if="invoice.rewardsTotal > 0"
+                class="card-invoice__adjustment-row"
+              >
+                <span>Cashback com pontos</span>
+                <strong class="is-credit">
+                  − <UiMoney :value="invoice.rewardsTotal" />
+                </strong>
+              </div>
+              <div
+                v-for="reward in invoice.rewards"
+                :key="reward.id"
+                class="card-invoice__reward-meta"
+              >
+                <span>{{ reward.program }}</span>
+                <span>
+                  {{ reward.pointsUsed.toLocaleString('pt-BR') }} pontos ·
+                  {{ formatMoney(reward.creditAmount) }} ·
+                  {{ formatMoney(rewardValuePerThousand(reward.pointsUsed, reward.creditAmount)) }}/mil ·
+                  {{ formatDateBr(reward.creditedAt) }}
+                </span>
               </div>
               <div class="card-invoice__adjustment-row">
                 <span>Ajuste</span>
@@ -660,6 +797,14 @@ async function onPaymentSaved() {
           <UiButton
             v-if="invoice.status !== 'paid'"
             variant="secondary"
+            @click="rewardDrawerOpen = true"
+          >
+            <template #leading><Coins /></template>
+            Cashback
+          </UiButton>
+          <UiButton
+            v-if="invoice.status !== 'paid'"
+            variant="secondary"
             @click="adjustmentDrawerOpen = true"
           >
             <template #leading><SlidersHorizontal /></template>
@@ -714,8 +859,8 @@ async function onPaymentSaved() {
           <div>
             <h2>Lançamentos</h2>
             <p>
-              {{ filteredEntries.length }}
-              {{ filteredEntries.length === 1 ? 'item' : 'itens' }}
+              {{ visibleItemCount }}
+              {{ visibleItemCount === 1 ? 'item' : 'itens' }}
             </p>
           </div>
           <div class="card-entries__controls">
@@ -743,7 +888,7 @@ async function onPaymentSaved() {
         </div>
 
         <div
-          v-if="filteredEntries.length && sortBy === 'date'"
+          v-if="dateGroups.length && sortBy === 'date'"
           class="card-date-groups"
         >
           <section
@@ -756,26 +901,57 @@ async function onPaymentSaved() {
                 <strong>{{ group.label }}</strong>
                 <span>
                   <template v-if="group.weekday">{{ group.weekday }} · </template>
-                  {{ group.entries.length }}
-                  {{ group.entries.length === 1 ? 'compra' : 'compras' }}
+                  {{ group.items.length }}
+                  {{ group.items.length === 1 ? 'lançamento' : 'lançamentos' }}
                   · <UiMoney :value="group.total" />
                 </span>
               </div>
             </header>
             <div class="card-date-group__body">
-              <CardsCardInvoiceEntryRow
-                v-for="entry in group.entries"
-                :key="entry.id"
-                :entry="entry"
-                @duplicate="openDuplicateDrawer(entry)"
-                @edit="openExpenseDrawer(entry)"
-                @remove="removeExpense(entry)"
-              />
+              <template v-for="item in group.items" :key="item.key">
+                <CardsCardInvoiceEntryRow
+                  v-if="item.kind === 'expense'"
+                  :entry="item.entry"
+                  @duplicate="openDuplicateDrawer(item.entry)"
+                  @edit="openExpenseDrawer(item.entry)"
+                  @remove="removeExpense(item.entry)"
+                />
+                <CardsCardInvoiceRewardRow
+                  v-else
+                  :reward="item.reward"
+                  @manage="rewardDrawerOpen = true"
+                />
+              </template>
             </div>
           </section>
         </div>
 
-        <div v-else-if="filteredEntries.length && showCategoryGroups" class="card-entry-groups">
+        <div v-else-if="visibleItemCount && showCategoryGroups" class="card-entry-groups">
+          <section v-if="filteredRewards.length" class="card-entry-group">
+            <div class="card-entry-group__header card-entry-group__header--static">
+              <span class="card-entry-group__icon" aria-hidden="true">
+                <span class="card-entry-group__reward-icon"><Coins /></span>
+              </span>
+              <span class="card-entry-group__meta">
+                <strong>Créditos na fatura</strong>
+                <span>
+                  {{ filteredRewards.length }}
+                  {{ filteredRewards.length === 1 ? 'item' : 'itens' }}
+                </span>
+              </span>
+              <strong class="card-entry-group__total is-credit">
+                − <UiMoney :value="filteredRewardsTotal" />
+              </strong>
+            </div>
+            <div class="card-entry-group__body">
+              <CardsCardInvoiceRewardRow
+                v-for="reward in filteredRewards"
+                :key="reward.id"
+                :reward="reward"
+                @manage="rewardDrawerOpen = true"
+              />
+            </div>
+          </section>
           <section
             v-for="group in categoryGroups"
             :key="group.key"
@@ -832,17 +1008,23 @@ async function onPaymentSaved() {
           </section>
         </div>
 
-        <UiList v-else-if="filteredEntries.length">
+        <UiList v-else-if="sortedListItems.length">
           <UiListItem
-            v-for="entry in filteredEntries"
-            :key="entry.id"
+            v-for="item in sortedListItems"
+            :key="item.key"
             class="card-entry-wrap"
           >
             <CardsCardInvoiceEntryRow
-              :entry="entry"
-              @duplicate="openDuplicateDrawer(entry)"
-              @edit="openExpenseDrawer(entry)"
-              @remove="removeExpense(entry)"
+              v-if="item.kind === 'expense'"
+              :entry="item.entry"
+              @duplicate="openDuplicateDrawer(item.entry)"
+              @edit="openExpenseDrawer(item.entry)"
+              @remove="removeExpense(item.entry)"
+            />
+            <CardsCardInvoiceRewardRow
+              v-else
+              :reward="item.reward"
+              @manage="rewardDrawerOpen = true"
             />
           </UiListItem>
         </UiList>
@@ -872,6 +1054,13 @@ async function onPaymentSaved() {
       <CardsCardInvoiceAdjustmentDrawer
         v-if="invoice"
         v-model:open="adjustmentDrawerOpen"
+        :card="card"
+        :invoice="invoice"
+        @saved="refreshInvoice"
+      />
+      <CardsCardInvoiceRewardDrawer
+        v-if="invoice"
+        v-model:open="rewardDrawerOpen"
         :card="card"
         :invoice="invoice"
         @saved="refreshInvoice"
@@ -1154,6 +1343,20 @@ async function onPaymentSaved() {
   color: var(--color-negative-ink);
 }
 
+.card-invoice__reward-meta {
+  display: flex;
+  padding-top: var(--space-2);
+  justify-content: space-between;
+  gap: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.card-invoice__reward-meta span:last-child {
+  text-align: right;
+}
+
 .card-invoice__payment-meta {
   margin: var(--space-2) 0;
   color: var(--color-ink-secondary);
@@ -1302,6 +1505,14 @@ async function onPaymentSaved() {
   background: var(--color-surface-subtle);
 }
 
+.card-entry-group__header--static {
+  cursor: default;
+}
+
+.card-entry-group__header--static:hover {
+  background: var(--color-surface);
+}
+
 .card-entry-group__icon {
   display: grid;
   flex-shrink: 0;
@@ -1319,6 +1530,21 @@ async function onPaymentSaved() {
   color: var(--color-ink-muted);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
+}
+
+.card-entry-group__reward-icon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-positive);
+  color: white;
+}
+
+.card-entry-group__reward-icon svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 .card-entry-group__meta {
@@ -1346,6 +1572,10 @@ async function onPaymentSaved() {
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.card-entry-group__total.is-credit {
+  color: var(--color-positive-ink);
 }
 
 .card-entry-group__chevron {

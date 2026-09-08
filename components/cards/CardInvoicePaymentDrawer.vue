@@ -25,7 +25,11 @@ const saving = ref(false)
 
 const adjustmentValue = computed(() => parseSignedMoney(adjustmentText.value))
 const previewTotal = computed(() =>
-  roundMoney(props.invoice.entriesSubtotal + (adjustmentValue.value ?? 0)),
+  roundMoney(
+    props.invoice.entriesSubtotal +
+      (adjustmentValue.value ?? 0) -
+      props.invoice.rewardsTotal,
+  ),
 )
 
 function todayIso() {
@@ -179,18 +183,21 @@ async function save() {
         <p class="invoice-pay__label">Fatura de {{ invoice.monthLabel }}</p>
         <p class="invoice-pay__total">{{ formatMoney(previewTotal) }}</p>
         <p
-          v-if="(adjustmentValue ?? 0) !== 0"
+          v-if="(adjustmentValue ?? 0) !== 0 || invoice.rewardsTotal > 0"
           class="invoice-pay__breakdown"
         >
           Calculado {{ formatMoney(invoice.entriesSubtotal) }}
-          ·
           <span
+            v-if="(adjustmentValue ?? 0) !== 0"
             :class="{
               'is-credit': (adjustmentValue ?? 0) < 0,
               'is-debit': (adjustmentValue ?? 0) > 0,
             }"
           >
-            {{ formatMoney(Math.abs(adjustmentValue ?? 0)) }} de ajuste
+            · {{ formatMoney(Math.abs(adjustmentValue ?? 0)) }} de ajuste
+          </span>
+          <span v-if="invoice.rewardsTotal > 0" class="is-credit">
+            · − {{ formatMoney(invoice.rewardsTotal) }} de cashback
           </span>
         </p>
       </div>
