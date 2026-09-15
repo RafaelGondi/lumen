@@ -451,10 +451,16 @@ function dominantColor(items: SpendingCalendarItem[]) {
 function computeStats(days: SpendingCalendarDay[], today: string) {
   const spendFlags = days.map((day) => day.count > 0)
   const daysWithSpend = spendFlags.filter(Boolean).length
+  // Streaks representam comportamento já ocorrido. Em meses atuais, dias
+  // posteriores a hoje ainda não podem ser considerados dias sem compra;
+  // em meses futuros, portanto, não há streak a contabilizar.
+  const observedSpendFlags = days
+    .filter((day) => day.date <= today)
+    .map((day) => day.count > 0)
 
   let longestStreak = 0
   let run = 0
-  for (const hasSpend of spendFlags) {
+  for (const hasSpend of observedSpendFlags) {
     if (!hasSpend) {
       run += 1
       longestStreak = Math.max(longestStreak, run)
@@ -464,10 +470,8 @@ function computeStats(days: SpendingCalendarDay[], today: string) {
   }
 
   let currentStreak = 0
-  const todayIndex = days.findIndex((day) => day.date === today)
-  const streakEnd = todayIndex >= 0 ? todayIndex : days.length - 1
-  for (let index = streakEnd; index >= 0; index -= 1) {
-    if (spendFlags[index]) break
+  for (let index = observedSpendFlags.length - 1; index >= 0; index -= 1) {
+    if (observedSpendFlags[index]) break
     currentStreak += 1
   }
 

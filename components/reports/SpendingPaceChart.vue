@@ -32,6 +32,7 @@ const props = defineProps<{
   currentLabel: string
   previousLabel: string
   cutoffDay: number
+  extendPrevious: boolean
   selectedDay: number | null
 }>()
 
@@ -49,7 +50,7 @@ const colors = ref({
 })
 
 const chartDays = computed(() =>
-  props.cutoffDay > 0
+  props.cutoffDay > 0 && !props.extendPrevious
     ? props.days.filter((day) => day.day <= props.cutoffDay)
     : props.days,
 )

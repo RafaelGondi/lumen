@@ -2,6 +2,7 @@
 import type { Account } from '~/types/account'
 import type { Card } from '~/types/card'
 import type { CardInvoiceDetail } from '~/types/cardInvoice'
+import type { CardRewardProgram } from '~/types/cardReward'
 import {
   formatDateBr,
   parseDateBr,
@@ -22,6 +23,8 @@ const paymentDateText = ref('')
 const adjustmentText = ref('0,00')
 const errorMessage = ref('')
 const saving = ref(false)
+const rewardProgram = ref<CardRewardProgram | null>(null)
+const currencyRateText = ref('')
 
 const adjustmentValue = computed(() => parseSignedMoney(adjustmentText.value))
 const previewTotal = computed(() =>
@@ -31,6 +34,24 @@ const previewTotal = computed(() =>
       props.invoice.rewardsTotal,
   ),
 )
+const currencyRateValue = computed(() => {
+  const raw = currencyRateText.value.trim()
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw
+  const value = Number(normalized)
+  return Number.isFinite(value) && value > 0 ? roundMoney(value) : null
+})
+const expectedPoints = computed(() => {
+  if (!rewardProgram.value) return 0
+  const units =
+    rewardProgram.value.earningBasis === 'usd'
+      ? props.invoice.entriesSubtotal / (currencyRateValue.value ?? Number.NaN)
+      : props.invoice.entriesSubtotal
+  return Number.isFinite(units)
+    ? Math.floor(units * rewardProgram.value.pointsPerUnit)
+    : 0
+})
 
 function todayIso() {
   const now = new Date()
@@ -106,6 +127,16 @@ async function loadAccounts() {
   }
 }
 
+async function loadRewardProgram() {
+  try {
+    rewardProgram.value = await $fetch<CardRewardProgram | null>(
+      `/api/cards/${props.card.id}/reward-program`,
+    )
+  } catch {
+    rewardProgram.value = null
+  }
+}
+
 function resetForm() {
   errorMessage.value = ''
   accountId.value = null
@@ -117,12 +148,13 @@ function resetForm() {
       : maskSignedBrl(
           `${current < 0 ? '-' : ''}${String(Math.round(Math.abs(current) * 100))}`,
         )
+  currencyRateText.value = ''
 }
 
 watch(open, async (value) => {
   if (!value) return
   resetForm()
-  await loadAccounts()
+  await Promise.all([loadAccounts(), loadRewardProgram()])
 })
 
 function onAccountChange(event: Event) {
@@ -150,6 +182,13 @@ async function save() {
     errorMessage.value = 'O total da fatura deve ser maior que zero.'
     return
   }
+  if (
+    rewardProgram.value?.earningBasis === 'usd' &&
+    !currencyRateValue.value
+  ) {
+    errorMessage.value = 'Informe a cotação do dólar usada nesta fatura.'
+    return
+  }
 
   saving.value = true
   errorMessage.value = ''
@@ -161,6 +200,10 @@ async function save() {
         accountId: accountId.value,
         paymentDate,
         adjustment,
+        rewardCurrencyRate:
+          rewardProgram.value?.earningBasis === 'usd'
+            ? currencyRateValue.value
+            : null,
         notes: null,
       },
     })
@@ -197,9 +240,42 @@ async function save() {
             · {{ formatMoney(Math.abs(adjustmentValue ?? 0)) }} de ajuste
           </span>
           <span v-if="invoice.rewardsTotal > 0" class="is-credit">
-            · − {{ formatMoney(invoice.rewardsTotal) }} de cashback
+            · − {{ formatMoney(invoice.rewardsTotal) }} em créditos de pontos
           </span>
         </p>
+      </div>
+
+      <div v-if="rewardProgram" class="invoice-pay__reward">
+        <div>
+          <p>Pontos desta fatura</p>
+          <span>
+            Sobre {{ formatMoney(invoice.entriesSubtotal) }}, antes de ajustes e resgates
+          </span>
+        </div>
+        <strong v-if="expectedPoints">
+          + {{ expectedPoints.toLocaleString('pt-BR') }} pts
+        </strong>
+        <strong v-else>—</strong>
+      </div>
+
+      <div
+        v-if="rewardProgram?.earningBasis === 'usd'"
+        class="invoice-pay__section"
+      >
+        <div class="invoice-pay__field-head">
+          <p class="invoice-pay__field-label">Cotação do dólar da fatura <span>*</span></p>
+          <span>Use a cotação informada pelo banco para calcular os pontos com fidelidade.</span>
+        </div>
+        <div class="invoice-pay__money">
+          <span>R$</span>
+          <input
+            v-model="currencyRateText"
+            type="text"
+            inputmode="decimal"
+            placeholder="Ex.: 5,45"
+            aria-label="Cotação do dólar da fatura"
+          />
+        </div>
       </div>
 
       <div class="invoice-pay__section">
@@ -314,6 +390,21 @@ async function save() {
   flex-direction: column;
   gap: var(--space-2);
 }
+
+.invoice-pay__reward {
+  display: flex;
+  padding: var(--space-3) var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-positive-soft);
+}
+
+.invoice-pay__reward > div { display: flex; flex-direction: column; gap: .2rem; }
+.invoice-pay__reward p, .invoice-pay__reward strong { color: var(--color-positive-ink); font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.invoice-pay__reward span { color: var(--color-ink-secondary); font-size: var(--text-xs); }
+.invoice-pay__reward strong { white-space: nowrap; }
 
 .invoice-pay__field-head {
   display: flex;

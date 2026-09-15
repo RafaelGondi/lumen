@@ -19,7 +19,7 @@ const valuePerThousand = computed(() =>
     <span class="card-reward-row__icon" aria-hidden="true"><Coins /></span>
     <div class="card-reward-row__main">
       <div class="card-reward-row__title">
-        <strong>Cashback com pontos</strong>
+        <strong>Crédito com pontos</strong>
         <span>Crédito</span>
       </div>
       <p>
@@ -37,8 +37,8 @@ const valuePerThousand = computed(() =>
     <button
       type="button"
       class="card-reward-row__manage"
-      aria-label="Gerenciar cashback"
-      title="Gerenciar cashback"
+      aria-label="Gerenciar pontos e resgates"
+      title="Gerenciar pontos e resgates"
       @click="$emit('manage')"
     >
       <Pencil aria-hidden="true" />

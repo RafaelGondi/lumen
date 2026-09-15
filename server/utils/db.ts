@@ -428,7 +428,10 @@ function migrate(database: Database.Database) {
   migrateExpandedSeries(database)
   migrateCardInvoiceAdjustments(database)
   migrateCardInvoiceRewards(database)
+  migrateCardRewardPrograms(database)
   migrateCardInvoicePayments(database)
+  migrateCardRewardAccruals(database)
+  migrateCardRewardAdjustments(database)
   migrateSpendingLimits(database)
   migrateProjectionSnapshots(database)
   migrateCashFlowSnapshots(database)
@@ -614,6 +617,78 @@ function migrateCardInvoiceRewards(database: Database.Database) {
   `)
 }
 
+function migrateCardRewardPrograms(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS card_reward_programs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      card_id INTEGER NOT NULL UNIQUE REFERENCES cards(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      points_balance INTEGER NOT NULL DEFAULT 0 CHECK (points_balance >= 0),
+      value_per_thousand REAL NOT NULL CHECK (value_per_thousand > 0),
+      earning_basis TEXT NOT NULL DEFAULT 'brl'
+        CHECK (earning_basis IN ('brl', 'usd')),
+      points_per_unit REAL NOT NULL DEFAULT 1 CHECK (points_per_unit > 0),
+      projection_currency_rate REAL
+        CHECK (projection_currency_rate IS NULL OR projection_currency_rate > 0),
+      default_destination TEXT NOT NULL
+        CHECK (default_destination IN ('invoice', 'account')),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS card_reward_redemptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      program_id INTEGER NOT NULL
+        REFERENCES card_reward_programs(id) ON DELETE CASCADE,
+      destination TEXT NOT NULL CHECK (destination IN ('invoice', 'account')),
+      invoice_month TEXT,
+      invoice_reward_id INTEGER
+        REFERENCES card_invoice_rewards(id) ON DELETE SET NULL,
+      account_id INTEGER REFERENCES accounts(id) ON DELETE RESTRICT,
+      entry_id INTEGER REFERENCES entries(id) ON DELETE SET NULL,
+      points_used INTEGER NOT NULL CHECK (points_used > 0),
+      cash_amount REAL NOT NULL CHECK (cash_amount > 0),
+      redeemed_at TEXT NOT NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      CHECK (
+        (destination = 'invoice' AND invoice_month IS NOT NULL
+          AND invoice_reward_id IS NOT NULL AND account_id IS NULL
+          AND entry_id IS NULL)
+        OR
+        (destination = 'account' AND invoice_month IS NULL
+          AND invoice_reward_id IS NULL AND account_id IS NOT NULL
+          AND entry_id IS NOT NULL)
+      )
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_card_reward_redemptions_program_date
+      ON card_reward_redemptions (program_id, redeemed_at DESC, id DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_card_reward_redemptions_invoice_reward
+      ON card_reward_redemptions (invoice_reward_id)
+      WHERE invoice_reward_id IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_card_reward_redemptions_entry
+      ON card_reward_redemptions (entry_id)
+      WHERE entry_id IS NOT NULL;
+  `)
+
+  if (!hasColumn(database, 'card_reward_programs', 'earning_basis')) {
+    database.exec(
+      "ALTER TABLE card_reward_programs ADD COLUMN earning_basis TEXT NOT NULL DEFAULT 'brl'",
+    )
+  }
+  if (!hasColumn(database, 'card_reward_programs', 'points_per_unit')) {
+    database.exec(
+      'ALTER TABLE card_reward_programs ADD COLUMN points_per_unit REAL NOT NULL DEFAULT 1',
+    )
+  }
+  if (!hasColumn(database, 'card_reward_programs', 'projection_currency_rate')) {
+    database.exec(
+      'ALTER TABLE card_reward_programs ADD COLUMN projection_currency_rate REAL',
+    )
+  }
+}
+
 function migrateCardInvoicePayments(database: Database.Database) {
   database.exec(`
     CREATE TABLE IF NOT EXISTS card_invoice_payments (
@@ -634,6 +709,47 @@ function migrateCardInvoicePayments(database: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_card_invoice_pay_card_month
       ON card_invoice_payments (card_id, invoice_month);
+  `)
+}
+
+function migrateCardRewardAccruals(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS card_reward_accruals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      program_id INTEGER NOT NULL
+        REFERENCES card_reward_programs(id) ON DELETE CASCADE,
+      payment_id INTEGER NOT NULL
+        REFERENCES card_invoice_payments(id) ON DELETE CASCADE,
+      invoice_month TEXT NOT NULL,
+      eligible_amount REAL NOT NULL CHECK (eligible_amount >= 0),
+      earning_basis TEXT NOT NULL CHECK (earning_basis IN ('brl', 'usd')),
+      points_per_unit REAL NOT NULL CHECK (points_per_unit > 0),
+      currency_rate REAL CHECK (currency_rate IS NULL OR currency_rate > 0),
+      points_earned INTEGER NOT NULL CHECK (points_earned > 0),
+      created_at TEXT NOT NULL,
+      UNIQUE (program_id, invoice_month),
+      UNIQUE (payment_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_card_reward_accruals_program_month
+      ON card_reward_accruals (program_id, invoice_month DESC, id DESC);
+  `)
+}
+
+function migrateCardRewardAdjustments(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS card_reward_adjustments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      program_id INTEGER NOT NULL
+        REFERENCES card_reward_programs(id) ON DELETE CASCADE,
+      points_delta INTEGER NOT NULL CHECK (points_delta <> 0),
+      adjusted_at TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_card_reward_adjustments_program_date
+      ON card_reward_adjustments (program_id, adjusted_at DESC, id DESC);
   `)
 }
 

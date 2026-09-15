@@ -275,7 +275,7 @@ const filteredRewards = computed(() => {
     })
     const points = reward.pointsUsed.toLocaleString('pt-BR')
     return (
-      'cashback com pontos'.includes(term) ||
+      'cashback crédito resgate pontos'.includes(term) ||
       reward.program.toLowerCase().includes(term) ||
       (reward.notes?.toLowerCase().includes(term) ?? false) ||
       amount.includes(term) ||
@@ -416,9 +416,9 @@ const sortedListItems = computed<InvoiceListItem[]>(() => {
 
   return items.sort((left, right) => {
     const leftName =
-      left.kind === 'expense' ? left.entry.description : 'Cashback com pontos'
+      left.kind === 'expense' ? left.entry.description : 'Crédito com pontos'
     const rightName =
-      right.kind === 'expense' ? right.entry.description : 'Cashback com pontos'
+      right.kind === 'expense' ? right.entry.description : 'Crédito com pontos'
     const leftAmount =
       left.kind === 'expense' ? left.entry.amount : left.reward.creditAmount
     const rightAmount =
@@ -723,7 +723,7 @@ async function onPaymentSaved() {
                 v-if="invoice.rewardsTotal > 0"
                 class="card-invoice__adjustment-row"
               >
-                <span>Cashback com pontos</span>
+                <span>Créditos com pontos</span>
                 <strong class="is-credit">
                   − <UiMoney :value="invoice.rewardsTotal" />
                 </strong>
@@ -795,12 +795,11 @@ async function onPaymentSaved() {
 
         <div class="card-invoice__actions">
           <UiButton
-            v-if="invoice.status !== 'paid'"
             variant="secondary"
             @click="rewardDrawerOpen = true"
           >
             <template #leading><Coins /></template>
-            Cashback
+            Pontos
           </UiButton>
           <UiButton
             v-if="invoice.status !== 'paid'"
@@ -1058,7 +1057,7 @@ async function onPaymentSaved() {
         :invoice="invoice"
         @saved="refreshInvoice"
       />
-      <CardsCardInvoiceRewardDrawer
+      <CardsCardRewardProgramDrawer
         v-if="invoice"
         v-model:open="rewardDrawerOpen"
         :card="card"

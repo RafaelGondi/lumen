@@ -47,6 +47,17 @@ export default defineEventHandler((event) => {
     })
   }
 
+  const rewardRedemption = db
+    .prepare('SELECT 1 FROM card_reward_redemptions WHERE entry_id = ?')
+    .get(id)
+  if (rewardRedemption) {
+    throw createError({
+      statusCode: 400,
+      statusMessage:
+        'Este lançamento foi criado por um resgate. Exclua-o em Pontos, na página do cartão.',
+    })
+  }
+
   if (
     row.recurrence !== 'single' &&
     scope !== 'series' &&

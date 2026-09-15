@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { Gauge, Info, TrendingDown, TrendingUp } from '@lucide/vue'
+import {
+  CalendarRange,
+  Gauge,
+  Info,
+  TrendingDown,
+  TrendingUp,
+} from '@lucide/vue'
 import type { Category, Supercategory } from '~/types/category'
 import type {
   SpendingPaceDay,
@@ -30,6 +36,7 @@ const filterDimension = ref<'category' | 'supercategory'>('category')
 const selectedCategoryIds = ref<number[]>([])
 const selectedSupercategoryIds = ref<number[]>([])
 const selectedDayNumber = ref<number | null>(null)
+const extendPreviousMonth = ref(false)
 
 const viewOptions = [
   { value: 'cumulative' as const, label: 'Acumulado' },
@@ -101,6 +108,10 @@ const dimensionPlural = computed(() =>
 watch(filterDimension, () => {
   selectedCategoryIds.value = []
   selectedSupercategoryIds.value = []
+})
+
+watch(monthKey, () => {
+  extendPreviousMonth.value = false
 })
 
 const {
@@ -294,6 +305,18 @@ function shortDate(date: string | null) {
               :scope-options="filterDimensionOptions"
             />
             <UiSegmentedControl v-model="view" :options="viewOptions" />
+            <UiButton
+              v-if="report.isCurrentMonth"
+              variant="secondary"
+              size="sm"
+              class="spending-pace__extend"
+              :class="{ 'is-active': extendPreviousMonth }"
+              :aria-pressed="extendPreviousMonth"
+              @click="extendPreviousMonth = !extendPreviousMonth"
+            >
+              <template #leading><CalendarRange /></template>
+              Mês anterior completo
+            </UiButton>
           </div>
         </header>
 
@@ -303,9 +326,18 @@ function shortDate(date: string | null) {
           :current-label="report.monthLabel"
           :previous-label="report.previousMonthLabel"
           :cutoff-day="report.cutoffDay"
+          :extend-previous="extendPreviousMonth"
           :selected-day="selectedDayNumber"
           @select="openDay"
         />
+
+        <p
+          v-if="report.isCurrentMonth && extendPreviousMonth"
+          class="spending-pace__extension-note"
+        >
+          A linha de {{ report.previousMonthLabel }} continua até o fim daquele
+          mês. A curva atual permanece limitada ao dia {{ report.cutoffDay }}.
+        </p>
 
         <div class="spending-pace__reading" :class="`is-${differenceTone}`">
           <component
@@ -493,6 +525,18 @@ function shortDate(date: string | null) {
   align-items: flex-start;
   justify-content: flex-end;
   gap: var(--space-3);
+}
+
+.spending-pace__extend.is-active {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.spending-pace__extension-note {
+  margin-top: calc(var(--space-3) * -1);
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
 }
 
 .spending-pace__reading {

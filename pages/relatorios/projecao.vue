@@ -53,7 +53,7 @@ watch(
     if (!selectedSnapshotIds.value.length) {
       selectedSnapshotIds.value = snapshots
         .filter((item) => item.kind === 'auto')
-        .slice(0, 3)
+        .slice(0, 1)
         .map((item) => item.id)
     }
   },

@@ -163,5 +163,7 @@ export interface CardInvoicePaymentPayload {
   paymentDate: string
   /** Se informado, atualiza o ajuste antes de pagar. */
   adjustment: number | null
+  /** Cotação em BRL por USD, exigida quando o cartão acumula por dólar. */
+  rewardCurrencyRate: number | null
   notes: string | null
 }

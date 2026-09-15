@@ -189,7 +189,7 @@ async function remove() {
           </dd>
         </div>
         <div v-if="invoice.rewardsTotal > 0">
-          <dt>Cashback com pontos</dt>
+          <dt>Créditos com pontos</dt>
           <dd class="is-credit">−{{ formatMoney(invoice.rewardsTotal) }}</dd>
         </div>
         <div class="invoice-adjustment__total">

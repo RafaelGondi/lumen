@@ -111,6 +111,18 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+
+  const rewardRedemption = db
+    .prepare('SELECT 1 FROM card_reward_redemptions WHERE entry_id = ?')
+    .get(id)
+  if (rewardRedemption) {
+    throw createError({
+      statusCode: 400,
+      statusMessage:
+        'Este lançamento foi criado por um resgate. Edite-o em Pontos, na página do cartão.',
+    })
+  }
+
   const requestedEndDate =
     body.endDate === undefined ? parent.endDate : body.endDate
 

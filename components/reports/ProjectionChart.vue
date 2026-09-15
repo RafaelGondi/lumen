@@ -160,11 +160,19 @@ const options = computed<ChartOptions<'line'>>(() => ({
       backgroundColor: tokens.value.ink,
       titleColor: tokens.value.surface,
       bodyColor: tokens.value.surface,
+      footerColor: tokens.value.surface,
       padding: 12,
       displayColors: true,
       callbacks: {
         label: (context) =>
           `${context.dataset.label}: ${formatMoney(Number(context.raw))}`,
+        footer: (items) => {
+          if (items.length !== 2) return ''
+          const current = Number(items[0]?.raw)
+          const comparison = Number(items[1]?.raw)
+          if (!Number.isFinite(current) || !Number.isFinite(comparison)) return ''
+          return `Diferença: ${formatSignedMoney(current - comparison)}`
+        },
       },
     },
   },
@@ -206,6 +214,11 @@ function formatMoney(value: number) {
     style: 'currency',
     currency: 'BRL',
   })
+}
+
+function formatSignedMoney(value: number) {
+  if (Math.abs(value) < 0.005) return formatMoney(0)
+  return `${value > 0 ? '+' : '−'} ${formatMoney(Math.abs(value))}`
 }
 </script>
 

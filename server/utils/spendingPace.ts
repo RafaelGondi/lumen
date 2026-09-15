@@ -80,9 +80,9 @@ export function buildSpendingPaceReport(
       ? Math.min(now.getDate(), current.days.length)
       : current.days.length
   const comparableDay = Math.min(cutoffDay, previous.days.length)
-  const previousVisibleDay = isCurrentMonth
-    ? comparableDay
-    : previous.days.length
+  // Mantemos o mês anterior completo no payload. A interface decide se exibe
+  // apenas o período comparável ou a continuação da curva, sem alterar os KPIs.
+  const previousVisibleDay = previous.days.length
   const maxDays = Math.max(current.days.length, previous.days.length)
 
   let currentRunning = 0

@@ -5,8 +5,10 @@ import { parseCardIdParam } from '../../../../utils/cardPayload'
 import { buildCardInvoice } from '../../../../utils/cardInvoice'
 import { upsertCardInvoiceAdjustment } from '../../../../utils/cardInvoiceAdjustment'
 import { insertCardInvoicePayment } from '../../../../utils/cardInvoicePayment'
+import { calculateRewardPoints } from '../../../../utils/cardRewards'
 import type { BankKey } from '~/types/account'
 import type { Card } from '~/types/card'
+import type { CardRewardEarningBasis } from '~/types/cardReward'
 
 function badRequest(message: string): never {
   throw createError({ statusCode: 400, statusMessage: message })
@@ -61,11 +63,28 @@ function parsePayload(body: unknown): CardInvoicePaymentPayload {
     notes = trimmed || null
   }
 
+  let rewardCurrencyRate: number | null = null
+  if (
+    raw.rewardCurrencyRate !== null &&
+    raw.rewardCurrencyRate !== undefined
+  ) {
+    if (
+      typeof raw.rewardCurrencyRate !== 'number' ||
+      !Number.isFinite(raw.rewardCurrencyRate) ||
+      raw.rewardCurrencyRate <= 0 ||
+      raw.rewardCurrencyRate > 1_000
+    ) {
+      badRequest('Informe uma cotação do dólar válida.')
+    }
+    rewardCurrencyRate = roundMoney(raw.rewardCurrencyRate)
+  }
+
   return {
     month: raw.month,
     accountId: raw.accountId,
     paymentDate: parseIsoDate(raw.paymentDate, 'Data do pagamento'),
     adjustment,
+    rewardCurrencyRate,
     notes,
   }
 }
@@ -125,6 +144,24 @@ export default defineEventHandler(async (event) => {
   const payload = parsePayload(await readBody(event))
   const db = useDb()
   const card = loadCard(cardId)
+  const rewardProgram = db
+    .prepare(
+      `SELECT id, earning_basis AS earningBasis,
+              points_per_unit AS pointsPerUnit
+       FROM card_reward_programs
+       WHERE card_id = ?`,
+    )
+    .get(cardId) as
+    | {
+        id: number
+        earningBasis: CardRewardEarningBasis
+        pointsPerUnit: number
+      }
+    | undefined
+
+  if (rewardProgram?.earningBasis === 'usd' && !payload.rewardCurrencyRate) {
+    badRequest('Informe a cotação do dólar usada nesta fatura.')
+  }
 
   const account = db
     .prepare('SELECT id, name FROM accounts WHERE id = ?')
@@ -188,7 +225,7 @@ export default defineEventHandler(async (event) => {
       })
 
     const entryId = Number(entryResult.lastInsertRowid)
-    insertCardInvoicePayment(db, {
+    const paymentId = insertCardInvoicePayment(db, {
       cardId,
       invoiceMonth: payload.month,
       accountId: payload.accountId,
@@ -200,8 +237,58 @@ export default defineEventHandler(async (event) => {
       notes: payload.notes,
     })
 
+    const pointsEarned = rewardProgram
+      ? calculateRewardPoints(
+          invoice.entriesSubtotal,
+          rewardProgram.earningBasis,
+          rewardProgram.pointsPerUnit,
+          payload.rewardCurrencyRate,
+        )
+      : 0
+
+    if (rewardProgram && pointsEarned > 0) {
+      db.prepare(
+        `INSERT INTO card_reward_accruals (
+           program_id, payment_id, invoice_month, eligible_amount,
+           earning_basis, points_per_unit, currency_rate, points_earned,
+           created_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        rewardProgram.id,
+        paymentId,
+        payload.month,
+        invoice.entriesSubtotal,
+        rewardProgram.earningBasis,
+        rewardProgram.pointsPerUnit,
+        rewardProgram.earningBasis === 'usd'
+          ? payload.rewardCurrencyRate
+          : null,
+        pointsEarned,
+        createdAt,
+      )
+      db.prepare(
+        `UPDATE card_reward_programs
+         SET points_balance = points_balance + ?,
+             projection_currency_rate =
+               CASE WHEN ? IS NOT NULL THEN ? ELSE projection_currency_rate END,
+             updated_at = ?
+         WHERE id = ?`,
+      ).run(
+        pointsEarned,
+        rewardProgram.earningBasis === 'usd'
+          ? payload.rewardCurrencyRate
+          : null,
+        rewardProgram.earningBasis === 'usd'
+          ? payload.rewardCurrencyRate
+          : null,
+        createdAt,
+        rewardProgram.id,
+      )
+    }
+
     return {
       entryId,
+      pointsEarned,
       balance: accountBalance(db, payload.accountId),
       invoice: buildCardInvoice(db, card, payload.month),
     }

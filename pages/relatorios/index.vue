@@ -5,6 +5,7 @@ import {
   ArrowLeftRight,
   ArrowUpRight,
   CreditCard,
+  LoaderCircle,
   Receipt,
 } from '@lucide/vue'
 import type { BankKey } from '~/types/account'
@@ -261,7 +262,7 @@ function movementMeta(movement: CashFlowMovement) {
     >
       <template #actions>
         <UiMonthSwitcher
-          :label="report?.fullLabel ?? monthLabel"
+          :label="monthLabel"
           :year="selectedYear"
           :month="selectedMonth"
           :can-go-previous="true"
@@ -284,7 +285,19 @@ function movementMeta(movement: CashFlowMovement) {
       />
     </div>
 
-    <template v-else>
+    <div v-else class="reports-content" :aria-busy="pending">
+      <div
+        v-if="pending && report"
+        class="reports-content__loading"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="reports-content__loading-pill">
+          <LoaderCircle aria-hidden="true" />
+          Calculando {{ monthLabel }}…
+        </span>
+      </div>
+
       <section
         class="reports-overview"
         :class="{ 'reports-overview--single-risk': kpiCards.length === 1 }"
@@ -370,7 +383,14 @@ function movementMeta(movement: CashFlowMovement) {
         />
       </UiCard>
 
-      <div class="reports-bottom">
+      <div v-if="pending && !report" class="reports-bottom">
+        <UiCard v-for="index in 2" :key="index">
+          <UiSkeleton width="9rem" height="1rem" />
+          <UiSkeleton height="7rem" radius="md" class="reports-page__gap" />
+        </UiCard>
+      </div>
+
+      <div v-else class="reports-bottom">
         <UiCard class="reports-critical">
           <div class="reports-critical__heading">
             <h2>
@@ -527,7 +547,7 @@ function movementMeta(movement: CashFlowMovement) {
           </ul>
         </UiCard>
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -540,6 +560,54 @@ function movementMeta(movement: CashFlowMovement) {
 
 .reports-page__gap {
   margin-top: var(--space-3);
+}
+
+.reports-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.reports-content__loading {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  display: flex;
+  padding-top: var(--space-7);
+  align-items: flex-start;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 76%, transparent);
+  backdrop-filter: blur(1px);
+}
+
+.reports-content__loading-pill {
+  display: inline-flex;
+  min-height: 2.75rem;
+  padding: 0 var(--space-4);
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-ink-secondary);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.reports-content__loading-pill svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-brand);
+  animation: reports-loading-spin 0.8s linear infinite;
+}
+
+@keyframes reports-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .reports-overview {
