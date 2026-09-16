@@ -20,7 +20,10 @@ const amountValue = computed(() => parseSignedMoney(amountText.value))
 const previewTotal = computed(() => {
   const adjustment = amountValue.value ?? 0
   return roundMoney(
-    props.invoice.entriesSubtotal + adjustment - props.invoice.rewardsTotal,
+    props.invoice.entriesSubtotal +
+      adjustment -
+      props.invoice.rewardsTotal -
+      props.invoice.creditsTotal,
   )
 })
 const hasExisting = computed(() => props.invoice.adjustment !== 0)
@@ -191,6 +194,10 @@ async function remove() {
         <div v-if="invoice.rewardsTotal > 0">
           <dt>Créditos com pontos</dt>
           <dd class="is-credit">−{{ formatMoney(invoice.rewardsTotal) }}</dd>
+        </div>
+        <div v-if="invoice.creditsTotal > 0">
+          <dt>Estornos</dt>
+          <dd class="is-credit">−{{ formatMoney(invoice.creditsTotal) }}</dd>
         </div>
         <div class="invoice-adjustment__total">
           <dt>Total da fatura</dt>

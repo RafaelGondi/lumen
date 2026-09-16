@@ -8,6 +8,7 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
+  Undo2,
   Wallet,
 } from '@lucide/vue'
 import type { Card } from '~/types/card'
@@ -63,6 +64,7 @@ const invoiceSectionRef = ref<HTMLElement | null>(null)
 const expenseDrawerOpen = ref(false)
 const adjustmentDrawerOpen = ref(false)
 const rewardDrawerOpen = ref(false)
+const creditDrawerOpen = ref(false)
 const paymentDrawerOpen = ref(false)
 const deleteDialogOpen = ref(false)
 const pendingDeleteExpense = ref<CardInvoiceDetail['entries'][number] | null>(
@@ -284,14 +286,46 @@ const filteredRewards = computed(() => {
   })
 })
 
+const filteredCredits = computed(() => {
+  if (entryTypeFilter.value !== 'all') return []
+  const credits = invoice.value?.credits ?? []
+  const term = searchQuery.value.trim().toLowerCase()
+  if (!term) return credits
+
+  return credits.filter((credit) => {
+    const amount = credit.creditAmount.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+    return (
+      'estorno devolução crédito'.includes(term) ||
+      credit.description.toLowerCase().includes(term) ||
+      (credit.notes?.toLowerCase().includes(term) ?? false) ||
+      amount.includes(term)
+    )
+  })
+})
+
 const visibleItemCount = computed(
-  () => filteredEntries.value.length + filteredRewards.value.length,
+  () =>
+    filteredEntries.value.length +
+    filteredRewards.value.length +
+    filteredCredits.value.length,
 )
 
 const filteredRewardsTotal = computed(() =>
   roundMoney(
     filteredRewards.value.reduce(
       (total, reward) => total + reward.creditAmount,
+      0,
+    ),
+  ),
+)
+
+const filteredCreditsTotal = computed(() =>
+  roundMoney(
+    filteredCredits.value.reduce(
+      (total, credit) => total + credit.creditAmount,
       0,
     ),
   ),
@@ -320,9 +354,11 @@ const filteredEntries = computed(() => {
 
 type InvoiceEntry = CardInvoiceDetail['entries'][number]
 type InvoiceReward = CardInvoiceDetail['rewards'][number]
+type InvoiceCredit = CardInvoiceDetail['credits'][number]
 type DateGroupItem =
   | { key: string; kind: 'expense'; entry: InvoiceEntry }
   | { key: string; kind: 'reward'; reward: InvoiceReward }
+  | { key: string; kind: 'credit'; credit: InvoiceCredit }
 
 type InvoiceListItem = DateGroupItem
 
@@ -394,6 +430,24 @@ const dateGroups = computed<DateEntryGroup[]>(() => {
     })
   }
 
+  for (const credit of filteredCredits.value) {
+    const key = credit.creditedAt
+    const current = groups.get(key)
+    if (current) {
+      current.items.push({ key: `credit:${credit.id}`, kind: 'credit', credit })
+      current.total = roundMoney(current.total - credit.creditAmount)
+      continue
+    }
+
+    const formatted = formatDateGroup(key)
+    groups.set(key, {
+      key,
+      ...formatted,
+      total: roundMoney(-credit.creditAmount),
+      items: [{ key: `credit:${credit.id}`, kind: 'credit', credit }],
+    })
+  }
+
   return [...groups.values()].sort((a, b) =>
     sortDir.value === 'asc' ? a.key.localeCompare(b.key) : b.key.localeCompare(a.key),
   )
@@ -411,22 +465,45 @@ const sortedListItems = computed<InvoiceListItem[]>(() => {
       kind: 'reward' as const,
       reward,
     })),
+    ...filteredCredits.value.map((credit) => ({
+      key: `credit:${credit.id}`,
+      kind: 'credit' as const,
+      credit,
+    })),
   ]
   const factor = sortDir.value === 'asc' ? 1 : -1
 
   return items.sort((left, right) => {
-    const leftName =
-      left.kind === 'expense' ? left.entry.description : 'Crédito com pontos'
-    const rightName =
-      right.kind === 'expense' ? right.entry.description : 'Crédito com pontos'
-    const leftAmount =
-      left.kind === 'expense' ? left.entry.amount : left.reward.creditAmount
-    const rightAmount =
-      right.kind === 'expense' ? right.entry.amount : right.reward.creditAmount
-    const leftDate =
-      left.kind === 'expense' ? entryPurchaseDate(left.entry) : left.reward.creditedAt
-    const rightDate =
-      right.kind === 'expense' ? entryPurchaseDate(right.entry) : right.reward.creditedAt
+    const leftName = left.kind === 'expense'
+      ? left.entry.description
+      : left.kind === 'reward'
+        ? 'Crédito com pontos'
+        : left.credit.description
+    const rightName = right.kind === 'expense'
+      ? right.entry.description
+      : right.kind === 'reward'
+        ? 'Crédito com pontos'
+        : right.credit.description
+    const leftAmount = left.kind === 'expense'
+      ? left.entry.amount
+      : left.kind === 'reward'
+        ? left.reward.creditAmount
+        : left.credit.creditAmount
+    const rightAmount = right.kind === 'expense'
+      ? right.entry.amount
+      : right.kind === 'reward'
+        ? right.reward.creditAmount
+        : right.credit.creditAmount
+    const leftDate = left.kind === 'expense'
+      ? entryPurchaseDate(left.entry)
+      : left.kind === 'reward'
+        ? left.reward.creditedAt
+        : left.credit.creditedAt
+    const rightDate = right.kind === 'expense'
+      ? entryPurchaseDate(right.entry)
+      : right.kind === 'reward'
+        ? right.reward.creditedAt
+        : right.credit.creditedAt
 
     const primary =
       sortBy.value === 'amount'
@@ -540,6 +617,15 @@ async function confirmDeleteExpense(scope: EntrySeriesScope) {
   await refreshInvoice()
 }
 
+async function removeCredit(credit: InvoiceCredit) {
+  if (!window.confirm(`Remover o estorno "${credit.description}"?`)) return
+  await $fetch(
+    `/api/cards/${cardId.value}/invoice/credits/${credit.id}`,
+    { method: 'DELETE' },
+  )
+  await Promise.all([refreshInvoice(), refreshCard()])
+}
+
 function cancelDeleteExpense() {
   pendingDeleteExpense.value = null
 }
@@ -558,6 +644,10 @@ const deleteShowsScope = computed(
 )
 
 async function onPaymentSaved() {
+  await Promise.all([refreshInvoice(), refreshCard()])
+}
+
+async function onInvoiceCreditSaved() {
   await Promise.all([refreshInvoice(), refreshCard()])
 }
 </script>
@@ -707,7 +797,11 @@ async function onPaymentSaved() {
               <UiMoney :value="invoice.total" />
             </p>
             <div
-              v-if="invoice.adjustment !== 0 || invoice.rewardsTotal > 0"
+              v-if="
+                invoice.adjustment !== 0 ||
+                invoice.rewardsTotal > 0 ||
+                invoice.creditsTotal > 0
+              "
               class="card-invoice__adjustment"
             >
               <div
@@ -741,7 +835,19 @@ async function onPaymentSaved() {
                   {{ formatDateBr(reward.creditedAt) }}
                 </span>
               </div>
-              <div class="card-invoice__adjustment-row">
+              <div
+                v-if="invoice.creditsTotal > 0"
+                class="card-invoice__adjustment-row"
+              >
+                <span>Estornos</span>
+                <strong class="is-credit">
+                  − <UiMoney :value="invoice.creditsTotal" />
+                </strong>
+              </div>
+              <div
+                v-if="invoice.adjustment !== 0"
+                class="card-invoice__adjustment-row"
+              >
                 <span>Ajuste</span>
                 <strong
                   :class="{
@@ -800,6 +906,14 @@ async function onPaymentSaved() {
           >
             <template #leading><Coins /></template>
             Pontos
+          </UiButton>
+          <UiButton
+            v-if="invoice.status !== 'paid'"
+            variant="secondary"
+            @click="creditDrawerOpen = true"
+          >
+            <template #leading><Undo2 /></template>
+            Estorno
           </UiButton>
           <UiButton
             v-if="invoice.status !== 'paid'"
@@ -916,9 +1030,15 @@ async function onPaymentSaved() {
                   @remove="removeExpense(item.entry)"
                 />
                 <CardsCardInvoiceRewardRow
-                  v-else
+                  v-else-if="item.kind === 'reward'"
                   :reward="item.reward"
                   @manage="rewardDrawerOpen = true"
+                />
+                <CardsCardInvoiceCreditRow
+                  v-else
+                  :credit="item.credit"
+                  :readonly="invoice?.status === 'paid'"
+                  @remove="removeCredit(item.credit)"
                 />
               </template>
             </div>
@@ -926,7 +1046,10 @@ async function onPaymentSaved() {
         </div>
 
         <div v-else-if="visibleItemCount && showCategoryGroups" class="card-entry-groups">
-          <section v-if="filteredRewards.length" class="card-entry-group">
+          <section
+            v-if="filteredRewards.length || filteredCredits.length"
+            class="card-entry-group"
+          >
             <div class="card-entry-group__header card-entry-group__header--static">
               <span class="card-entry-group__icon" aria-hidden="true">
                 <span class="card-entry-group__reward-icon"><Coins /></span>
@@ -934,12 +1057,12 @@ async function onPaymentSaved() {
               <span class="card-entry-group__meta">
                 <strong>Créditos na fatura</strong>
                 <span>
-                  {{ filteredRewards.length }}
-                  {{ filteredRewards.length === 1 ? 'item' : 'itens' }}
+                  {{ filteredRewards.length + filteredCredits.length }}
+                  {{ filteredRewards.length + filteredCredits.length === 1 ? 'item' : 'itens' }}
                 </span>
               </span>
               <strong class="card-entry-group__total is-credit">
-                − <UiMoney :value="filteredRewardsTotal" />
+                − <UiMoney :value="filteredRewardsTotal + filteredCreditsTotal" />
               </strong>
             </div>
             <div class="card-entry-group__body">
@@ -948,6 +1071,13 @@ async function onPaymentSaved() {
                 :key="reward.id"
                 :reward="reward"
                 @manage="rewardDrawerOpen = true"
+              />
+              <CardsCardInvoiceCreditRow
+                v-for="credit in filteredCredits"
+                :key="credit.id"
+                :credit="credit"
+                :readonly="invoice?.status === 'paid'"
+                @remove="removeCredit(credit)"
               />
             </div>
           </section>
@@ -1021,9 +1151,15 @@ async function onPaymentSaved() {
               @remove="removeExpense(item.entry)"
             />
             <CardsCardInvoiceRewardRow
-              v-else
+              v-else-if="item.kind === 'reward'"
               :reward="item.reward"
               @manage="rewardDrawerOpen = true"
+            />
+            <CardsCardInvoiceCreditRow
+              v-else
+              :credit="item.credit"
+              :readonly="invoice?.status === 'paid'"
+              @remove="removeCredit(item.credit)"
             />
           </UiListItem>
         </UiList>
@@ -1056,6 +1192,13 @@ async function onPaymentSaved() {
         :card="card"
         :invoice="invoice"
         @saved="refreshInvoice"
+      />
+      <CardsCardInvoiceCreditDrawer
+        v-if="invoice"
+        v-model:open="creditDrawerOpen"
+        :card="card"
+        :invoice="invoice"
+        @saved="onInvoiceCreditSaved"
       />
       <CardsCardRewardProgramDrawer
         v-if="invoice"

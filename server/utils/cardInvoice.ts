@@ -24,6 +24,11 @@ import {
   loadCardInvoiceRewardsMap,
   loadRewardsForCards,
 } from './cardInvoiceReward'
+import {
+  loadCardInvoiceCredits,
+  loadCardInvoiceCreditsMap,
+  loadCreditsForCards,
+} from './cardInvoiceCredit'
 
 const MONTH_SHORT = [
   'Jan',
@@ -197,6 +202,7 @@ function invoiceMonthAmount(
   month: string,
   adjustments: Map<string, number>,
   rewards: Map<string, number>,
+  credits: Map<string, number>,
   payments: Map<string, { totalPaid: number }>,
 ) {
   const payment = payments.get(month)
@@ -210,7 +216,8 @@ function invoiceMonthAmount(
       0,
       entriesSubtotal +
         (adjustments.get(month) ?? 0) -
-        (rewards.get(month) ?? 0),
+        (rewards.get(month) ?? 0) -
+        (credits.get(month) ?? 0),
     ),
   )
 }
@@ -222,6 +229,7 @@ function buildProjection(
 ): CardInvoiceProjectionMonth[] {
   const adjustments = loadCardInvoiceAdjustmentsMap(db, card.id)
   const rewards = loadCardInvoiceRewardsMap(db, card.id)
+  const credits = loadCardInvoiceCreditsMap(db, card.id)
   const payments = loadCardInvoicePaymentsMap(db, card.id)
   const months = Array.from({ length: 12 }, (_, index) => {
     const month = shiftMonth(focusMonth, index - 1)
@@ -234,6 +242,7 @@ function buildProjection(
         month,
         adjustments,
         rewards,
+        credits,
         payments,
       ),
     }
@@ -336,6 +345,10 @@ export function buildConsolidatedCardsProjection(
     db,
     mapped.map((card) => card.id),
   )
+  const credits = loadCreditsForCards(
+    db,
+    mapped.map((card) => card.id),
+  )
   const paidTotals = loadPaidTotalsForCards(
     db,
     mapped.map((card) => card.id),
@@ -365,7 +378,8 @@ export function buildConsolidatedCardsProjection(
         0,
         entriesSubtotal +
           (adjustments.get(`${card.id}:${month}`) ?? 0) -
-          (rewards.get(`${card.id}:${month}`) ?? 0),
+          (rewards.get(`${card.id}:${month}`) ?? 0) -
+          (credits.get(`${card.id}:${month}`) ?? 0),
       )
     }
     return {
@@ -434,6 +448,10 @@ export function buildCardInvoice(
   const rewardsTotal = roundMoney(
     rewards.reduce((sum, reward) => sum + reward.creditAmount, 0),
   )
+  const credits = loadCardInvoiceCredits(db, card.id, month)
+  const creditsTotal = roundMoney(
+    credits.reduce((sum, credit) => sum + credit.creditAmount, 0),
+  )
   const today = todayLocal()
 
   let entriesSubtotal: number
@@ -469,7 +487,10 @@ export function buildCardInvoice(
     adjustment = adjustmentRow?.amount ?? 0
     adjustmentNotes = adjustmentRow?.notes ?? null
     total = roundMoney(
-      Math.max(0, entriesSubtotal + adjustment - rewardsTotal),
+      Math.max(
+        0,
+        entriesSubtotal + adjustment - rewardsTotal - creditsTotal,
+      ),
     )
     const open = openInvoiceStatus(month, card.dueDay, today)
     status = open.status
@@ -502,6 +523,8 @@ export function buildCardInvoice(
     adjustmentNotes,
     rewards,
     rewardsTotal,
+    credits,
+    creditsTotal,
     total,
     creditLimit: card.creditLimit,
     usedAmount: committed,
@@ -540,6 +563,7 @@ export function cardUsageSummary(
   const paidInvoices = loadCardInvoicePaymentsMap(db, card.id)
   const cardAdjustments = loadCardInvoiceAdjustmentsMap(db, card.id)
   const cardRewards = loadCardInvoiceRewardsMap(db, card.id)
+  const cardCredits = loadCardInvoiceCreditsMap(db, card.id)
   /*
    * A janela é montada aqui, e não filtrando `buildCardInvoice().projection`:
    * aquela começa um mês antes do foco, então o filtro `>= fromMonth` deixava
@@ -559,6 +583,7 @@ export function cardUsageSummary(
         month,
         cardAdjustments,
         cardRewards,
+        cardCredits,
         paidInvoices,
       ),
     }))

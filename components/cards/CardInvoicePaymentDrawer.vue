@@ -31,7 +31,8 @@ const previewTotal = computed(() =>
   roundMoney(
     props.invoice.entriesSubtotal +
       (adjustmentValue.value ?? 0) -
-      props.invoice.rewardsTotal,
+      props.invoice.rewardsTotal -
+      props.invoice.creditsTotal,
   ),
 )
 const currencyRateValue = computed(() => {
@@ -226,7 +227,11 @@ async function save() {
         <p class="invoice-pay__label">Fatura de {{ invoice.monthLabel }}</p>
         <p class="invoice-pay__total">{{ formatMoney(previewTotal) }}</p>
         <p
-          v-if="(adjustmentValue ?? 0) !== 0 || invoice.rewardsTotal > 0"
+          v-if="
+            (adjustmentValue ?? 0) !== 0 ||
+            invoice.rewardsTotal > 0 ||
+            invoice.creditsTotal > 0
+          "
           class="invoice-pay__breakdown"
         >
           Calculado {{ formatMoney(invoice.entriesSubtotal) }}
@@ -241,6 +246,9 @@ async function save() {
           </span>
           <span v-if="invoice.rewardsTotal > 0" class="is-credit">
             · − {{ formatMoney(invoice.rewardsTotal) }} em créditos de pontos
+          </span>
+          <span v-if="invoice.creditsTotal > 0" class="is-credit">
+            · − {{ formatMoney(invoice.creditsTotal) }} em estornos
           </span>
         </p>
       </div>

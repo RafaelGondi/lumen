@@ -99,7 +99,11 @@ export interface CardInvoiceDetail {
   rewards: CardInvoiceReward[]
   /** Soma positiva dos créditos em `rewards`. */
   rewardsTotal: number
-  /** entriesSubtotal + adjustment - rewardsTotal */
+  /** Estornos avulsos registrados diretamente na fatura. */
+  credits: CardInvoiceCredit[]
+  /** Soma positiva dos estornos em `credits`. */
+  creditsTotal: number
+  /** entriesSubtotal + adjustment - rewardsTotal - creditsTotal */
   total: number
   creditLimit: number
   usedAmount: number
@@ -136,6 +140,24 @@ export interface CardInvoiceRewardPayload {
   month: string
   program: string
   pointsUsed: number
+  creditAmount: number
+  /** YYYY-MM-DD */
+  creditedAt: string
+  notes: string | null
+}
+
+export interface CardInvoiceCredit {
+  id: number
+  description: string
+  creditAmount: number
+  /** YYYY-MM-DD */
+  creditedAt: string
+  notes: string | null
+}
+
+export interface CardInvoiceCreditPayload {
+  month: string
+  description: string
   creditAmount: number
   /** YYYY-MM-DD */
   creditedAt: string
