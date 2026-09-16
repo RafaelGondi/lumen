@@ -150,6 +150,23 @@ function axisMoney(value: number) {
   return `R$ ${value.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`
 }
 
+type TooltipValueItem = {
+  datasetIndex: number
+  parsed: { y: number | null }
+}
+
+function tooltipDifference(items: TooltipValueItem[]) {
+  const previous = items.find((item) => item.datasetIndex === 0)?.parsed.y
+  const current = items.find((item) => item.datasetIndex === 1)?.parsed.y
+  if (previous === null || previous === undefined || current === null || current === undefined) {
+    return undefined
+  }
+
+  const difference = current - previous
+  const sign = difference > 0 ? '+' : difference < 0 ? '−' : ''
+  return ` Diferença: ${sign}${money(Math.abs(difference))}`
+}
+
 function baseOptions(type: 'line' | 'bar') {
   return {
     responsive: true,
@@ -175,6 +192,7 @@ function baseOptions(type: 'line' | 'bar') {
           title: (items: { label: string }[]) => `Dia ${items[0]?.label ?? ''}`,
           label: (context: { dataset: { label?: string }; parsed: { y: number | null } }) =>
             ` ${context.dataset.label}: ${money(context.parsed.y ?? 0)}`,
+          footer: (items: TooltipValueItem[]) => tooltipDifference(items),
         },
       },
     },
