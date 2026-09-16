@@ -49,6 +49,12 @@ function monthBounds(monthKey: string) {
   return { start, end, prevEnd, prevLabel, year, month }
 }
 
+function nextMonthKey(monthKey: string) {
+  const [yearRaw, monthRaw] = monthKey.split('-').map(Number)
+  const next = new Date(yearRaw!, monthRaw!, 1)
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`
+}
+
 function dueDateInMonth(monthKey: string, dueDay: number) {
   const [year, month] = monthKey.split('-').map(Number)
   const lastDay = new Date(year!, month!, 0).getDate()
@@ -235,6 +241,9 @@ export function buildDashboardMonth(monthKey: string): DashboardMonth {
 
   // Uma única fonte de verdade com o relatório de fluxo (inclui faturas no vencimento).
   const cashFlow = buildCashFlowReport(db, monthKey)
+  const followingMonthKey = nextMonthKey(monthKey)
+  const followingMonthCashFlow = buildCashFlowReport(db, followingMonthKey)
+  const followingMonthNumber = Number(followingMonthKey.slice(5, 7))
 
   // Mês passado: saldo no fim do período. Mês atual/futuro: saldo real de hoje
   // (nunca usar o fim do mês futuro como cutoff — isso marca tudo como liquidado).
@@ -310,8 +319,10 @@ export function buildDashboardMonth(monthKey: string): DashboardMonth {
   incomePending = roundMoney(incomePending)
   expensePaid = roundMoney(expensePaid)
 
-  // Previsto no fim do mês = fechamento do fluxo de caixa (mesma projeção do relatório).
-  const projectedEnd = cashFlow.closingBalance
+  // O vale do mês seguinte representa melhor o dinheiro efetivamente disponível:
+  // atravessa vencimentos e faturas já conhecidos, em vez de olhar só o fechamento.
+  const followingMonthWorstBalance = followingMonthCashFlow.worstBalance
+  const followingMonthName = MONTH_NAMES[followingMonthNumber - 1]!.toLowerCase()
   const monthResult = roundMoney(incomeTotal - expenseTotal)
   const settledBefore = settledOccurrencesUntil(db, prevEnd)
   const incomeUntilPrev = roundMoney(
@@ -364,7 +375,11 @@ export function buildDashboardMonth(monthKey: string): DashboardMonth {
     supportingText: 'Disponível em contas',
     tone: 'featured',
     breakdown: [
-      { label: 'Previsto no fim do mês', value: projectedEnd },
+      {
+        label: `Pior saldo em ${followingMonthName}`,
+        value: followingMonthWorstBalance,
+        tone: followingMonthWorstBalance < 0 ? 'negative' : 'default',
+      },
       {
         label: 'Resultado do mês',
         value: monthResult,

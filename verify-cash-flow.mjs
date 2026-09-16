@@ -1,4 +1,4 @@
-const base = 'http://127.0.0.1:3003'
+const base = process.env.LUMEN_TEST_BASE_URL ?? 'http://127.0.0.1:3003'
 
 async function api(path) {
   const response = await fetch(base + path)
@@ -25,6 +25,7 @@ const futureMonth = today.getMonth() === 11
 const current = await api(`/api/reports/cash-flow?month=${currentMonth}`)
 const past = await api(`/api/reports/cash-flow?month=${pastMonth}`)
 const future = await api(`/api/reports/cash-flow?month=${futureMonth}`)
+const dashboard = await api(`/api/dashboard?month=${currentMonth}`)
 const accounts = await api('/api/accounts')
 const accountsTotal = accounts.reduce((sum, account) => sum + account.balance, 0)
 
@@ -44,6 +45,19 @@ assert(
   'saldo diário inválido',
 )
 assert(current.criticalThreshold === 500, 'limiar crítico')
+
+const nextMonthName = new Intl.DateTimeFormat('pt-BR', { month: 'long' })
+  .format(new Date(`${futureMonth}-01T12:00:00`))
+  .toLowerCase()
+const nextMonthWorst = dashboard.stats.currentBalance.breakdown[0]
+assert(
+  nextMonthWorst.label === `Pior saldo em ${nextMonthName}`,
+  `rótulo do pior saldo seguinte: ${nextMonthWorst.label}`,
+)
+assert(
+  Math.abs(nextMonthWorst.value - future.worstBalance) < 0.01,
+  `pior saldo seguinte divergiu: ${nextMonthWorst.value} vs ${future.worstBalance}`,
+)
 
 const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 const todayPoint = current.days.find((day) => day.date === todayIso)
@@ -65,6 +79,8 @@ console.log(
       criticalDays: current.days.filter((day) => day.isCritical).length,
       pastTodayNull: past.todayBalance === null,
       futureTodayNull: future.todayBalance === null,
+      nextMonthWorst: nextMonthWorst.value,
+      nextMonthWorstLabel: nextMonthWorst.label,
       accountsTotal,
     },
     null,
