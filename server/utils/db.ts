@@ -386,6 +386,37 @@ function migrate(database: Database.Database) {
     )
   }
 
+  if (!hasColumn(database, 'entries', 'track_as_debt')) {
+    database.exec(
+      'ALTER TABLE entries ADD COLUMN track_as_debt INTEGER NOT NULL DEFAULT 0',
+    )
+    database.exec(`
+      UPDATE entries
+      SET track_as_debt = 1
+      WHERE type = 'expense'
+        AND card_id IS NULL
+        AND (
+          lower(description) LIKE '%dívida%'
+          OR lower(description) LIKE '%divida%'
+          OR lower(description) LIKE '%empréstimo%'
+          OR lower(description) LIKE '%emprestimo%'
+          OR lower(description) LIKE '%financiamento%'
+          OR lower(description) LIKE '%consórcio%'
+          OR lower(description) LIKE '%consorcio%'
+          OR category_id IN (
+            SELECT id FROM categories
+            WHERE lower(name) LIKE '%dívida%'
+               OR lower(name) LIKE '%divida%'
+               OR lower(name) LIKE '%empréstimo%'
+               OR lower(name) LIKE '%emprestimo%'
+               OR lower(name) LIKE '%financiamento%'
+               OR lower(name) LIKE '%consórcio%'
+               OR lower(name) LIKE '%consorcio%'
+          )
+        )
+    `)
+  }
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS entry_occurrence_payments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -438,6 +469,44 @@ function migrate(database: Database.Database) {
   migrateCashFlowSnapshots(database)
   migrateProjectionScenarios(database)
   migrateCategorizationRules(database)
+  migrateDebtTracking(database)
+}
+
+function migrateDebtTracking(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS debt_sources (
+      entry_id INTEGER PRIMARY KEY REFERENCES entries(id) ON DELETE CASCADE,
+      enabled INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS debt_card_sources (
+      card_id INTEGER PRIMARY KEY REFERENCES cards(id) ON DELETE CASCADE,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS debt_snapshots (
+      month TEXT PRIMARY KEY,
+      total REAL NOT NULL,
+      breakdown_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `)
+
+  // Preserva a seleção feita na primeira versão do relatório. Depois dessa
+  // migração, desmarcar no formulário também desativa a fonte correspondente.
+  database.exec(`
+    UPDATE entries
+    SET track_as_debt = 1
+    WHERE track_as_debt = 0
+      AND id IN (
+        SELECT entry_id FROM debt_sources WHERE enabled = 1
+      )
+  `)
 }
 
 function migrateProjectionScenarios(database: Database.Database) {
@@ -697,6 +766,7 @@ function migrateCardRewardPrograms(database: Database.Database) {
       "ALTER TABLE card_reward_programs ADD COLUMN earning_basis TEXT NOT NULL DEFAULT 'brl'",
     )
   }
+
   if (!hasColumn(database, 'card_reward_programs', 'points_per_unit')) {
     database.exec(
       'ALTER TABLE card_reward_programs ADD COLUMN points_per_unit REAL NOT NULL DEFAULT 1',

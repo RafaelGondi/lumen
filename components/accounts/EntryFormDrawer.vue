@@ -58,6 +58,7 @@ const dateText = ref('')
 const endDateText = ref('')
 const installmentCount = ref(2)
 const useMonthEnd = ref(false)
+const trackAsDebt = ref(false)
 const editScope = ref<EntrySeriesScope>('occurrence')
 const destinationAccountId = ref<number | null>(null)
 const destinationAccounts = ref<Account[]>([])
@@ -263,6 +264,7 @@ function resetForm() {
     endDateText.value = current.endDate ? formatDateBr(current.endDate) : ''
     installmentCount.value = current.installmentCount ?? 2
     useMonthEnd.value = current.useMonthEnd
+    trackAsDebt.value = current.trackAsDebt
     destinationAccountId.value = current.destinationAccountId
     editScope.value = 'occurrence'
     return
@@ -279,6 +281,7 @@ function resetForm() {
   endDateText.value = ''
   installmentCount.value = 2
   useMonthEnd.value = false
+  trackAsDebt.value = false
   destinationAccountId.value = null
   editScope.value = 'occurrence'
 }
@@ -305,6 +308,7 @@ function setEntryType(type: 'income' | 'expense' | 'transfer') {
     recurrence.value = 'single'
     destinationAccountId.value = null
   }
+  if (type !== 'expense') trackAsDebt.value = false
 }
 
 async function loadDestinationAccounts() {
@@ -383,6 +387,7 @@ async function save() {
           statementName: statementName.value.trim() || null,
           notes: notes.value.trim() || null,
           date: useMonthEnd.value ? monthEndLocal(date) : date,
+          trackAsDebt: isExpense.value && trackAsDebt.value,
           ...(props.entry.recurrence === 'fixed' &&
           endDate !== props.entry.endDate
             ? { endDate }
@@ -444,6 +449,7 @@ async function save() {
           !isTransfer.value &&
           recurrence.value === 'fixed' &&
           useMonthEnd.value,
+        trackAsDebt: isExpense.value && trackAsDebt.value,
       }
 
       await $fetch('/api/entries', { method: 'POST', body: payload })
@@ -820,6 +826,14 @@ async function save() {
           {{ fixedPreview }}
         </p>
       </template>
+
+      <label v-if="isExpense" class="entry-form__debt-toggle">
+        <input v-model="trackAsDebt" type="checkbox" />
+        <span>
+          <strong>Acompanhar como dívida</strong>
+          <small>Inclui este compromisso no relatório de evolução das dívidas.</small>
+        </span>
+      </label>
       </template>
 
       <p v-if="errorMessage" class="entry-form__error" role="alert">
@@ -1178,7 +1192,8 @@ async function save() {
   color: var(--color-negative-ink);
 }
 
-.entry-form__month-end {
+.entry-form__month-end,
+.entry-form__debt-toggle {
   display: flex;
   padding: var(--space-3) var(--space-4);
   align-items: flex-start;
@@ -1190,23 +1205,27 @@ async function save() {
   cursor: pointer;
 }
 
-.entry-form__month-end input {
+.entry-form__month-end input,
+.entry-form__debt-toggle input {
   margin-top: 0.15rem;
   accent-color: var(--color-positive);
 }
 
-.entry-form__month-end span {
+.entry-form__month-end span,
+.entry-form__debt-toggle span {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
 }
 
-.entry-form__month-end strong {
+.entry-form__month-end strong,
+.entry-form__debt-toggle strong {
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
 }
 
-.entry-form__month-end small {
+.entry-form__month-end small,
+.entry-form__debt-toggle small {
   color: var(--color-ink-muted);
   font-size: 0.6875rem;
 }

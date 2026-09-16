@@ -596,6 +596,7 @@ export function cardUsageSummary(
 
   return {
     usedAmount,
+    projection: openProjection,
     estimatedPayoffLabel: lastProjected
       ? monthLabel(lastProjected.month)
       : null,

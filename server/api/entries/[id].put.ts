@@ -74,7 +74,8 @@ export default defineEventHandler(async (event) => {
          created_at AS createdAt,
          payment_state AS paymentState,
          payment_date AS paymentDate,
-         month_end AS useMonthEnd
+         month_end AS useMonthEnd,
+         track_as_debt AS trackAsDebt
        FROM entries
        WHERE id = ?`,
     )
@@ -98,6 +99,7 @@ export default defineEventHandler(async (event) => {
         paymentState: string
         paymentDate: string | null
         useMonthEnd: number
+        trackAsDebt: number
       }
     | undefined
 
@@ -147,6 +149,13 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  if (typeof body.trackAsDebt !== 'boolean') {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Marcação de dívida inválida.',
+    })
+  }
+
   const values = {
     description: body.description.trim(),
     amount: roundMoney(body.amount),
@@ -170,6 +179,20 @@ export default defineEventHandler(async (event) => {
   )
 
   const edit = db.transaction(() => {
+    const shouldTrackAsDebt = parent.type === 'expense' && body.trackAsDebt
+    db.prepare('UPDATE entries SET track_as_debt = ? WHERE id = ?').run(
+      shouldTrackAsDebt ? 1 : 0,
+      id,
+    )
+    const now = new Date().toISOString()
+    db.prepare(
+      `INSERT INTO debt_sources (entry_id, enabled, created_at, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(entry_id) DO UPDATE SET
+         enabled = excluded.enabled,
+         updated_at = excluded.updated_at`,
+    ).run(id, shouldTrackAsDebt ? 1 : 0, now, now)
+
     if (parent.recurrence === 'single') {
       updateParent.run({
         ...values,
@@ -346,9 +369,9 @@ export default defineEventHandler(async (event) => {
          type, account_id, category_id, description, amount,
          statement_name, notes, recurrence, date, end_date,
          installment_count, installment_index, group_id, status, created_at,
-         payment_state, payment_date, month_end
+         payment_state, payment_date, month_end, track_as_debt
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'pending', ?,
-                 'auto', NULL, ?)`,
+                 'auto', NULL, ?, ?)`,
     ).run(
       parent.type,
       parent.accountId,
@@ -364,6 +387,7 @@ export default defineEventHandler(async (event) => {
       randomUUID(),
       todayLocal(),
       parent.useMonthEnd,
+      parent.type === 'expense' && body.trackAsDebt ? 1 : 0,
     )
     const newId = Number(result.lastInsertRowid)
     const oldStartIndex = monthIndex(body.occurrenceMonth)

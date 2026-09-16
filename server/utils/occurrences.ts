@@ -25,6 +25,7 @@ type ParentEntry = {
   paymentState: 'auto' | 'paid' | 'unpaid'
   paymentDate: string | null
   useMonthEnd: boolean
+  trackAsDebt: boolean
 }
 
 type OccurrencePayment = {
@@ -103,7 +104,8 @@ function loadParents(
        e.group_id AS groupId,
        e.payment_state AS paymentState,
        e.payment_date AS paymentDate,
-       e.month_end AS useMonthEnd
+       e.month_end AS useMonthEnd,
+       e.track_as_debt AS trackAsDebt
      FROM entries e
      JOIN accounts a ON a.id = e.account_id
      LEFT JOIN accounts d ON d.id = e.destination_account_id
@@ -300,6 +302,7 @@ function deriveOccurrence(
     settled,
     isException: exception?.action === 'edit',
     useMonthEnd: Boolean(parent.useMonthEnd),
+    trackAsDebt: Boolean(parent.trackAsDebt),
     transferDirection,
   }
 }
@@ -532,7 +535,8 @@ export function occurrenceByKey(
          e.group_id AS groupId,
          e.payment_state AS paymentState,
          e.payment_date AS paymentDate,
-         e.month_end AS useMonthEnd
+         e.month_end AS useMonthEnd,
+         e.track_as_debt AS trackAsDebt
        FROM entries e
        JOIN accounts a ON a.id = e.account_id
        LEFT JOIN accounts d ON d.id = e.destination_account_id

@@ -137,6 +137,7 @@ export function parseEntryPayload(body: unknown): EntryPayload {
     endDate: type === 'transfer' ? null : endDate,
     installmentCount: type === 'transfer' ? null : installmentCount,
     useMonthEnd: type === 'transfer' ? false : useMonthEnd,
+    trackAsDebt: type === 'expense' && raw.trackAsDebt === true,
   }
 }
 

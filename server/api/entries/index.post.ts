@@ -83,12 +83,12 @@ export default defineEventHandler(async (event) => {
          type, account_id, destination_account_id, category_id, description,
          amount, statement_name, notes, recurrence, date, end_date,
          installment_count, installment_index, group_id, status, created_at,
-         payment_state, payment_date, month_end
+         payment_state, payment_date, month_end, track_as_debt
        ) VALUES (
          @type, @accountId, @destinationAccountId, @categoryId, @description,
          @amount, @statementName, @notes, @recurrence, @date, @endDate,
          @installmentCount, NULL, @groupId, @status, @createdAt,
-         'auto', NULL, @monthEnd
+         'auto', NULL, @monthEnd, @trackAsDebt
        )`,
     )
     .run({
@@ -111,9 +111,18 @@ export default defineEventHandler(async (event) => {
       status: settledStatus,
       createdAt,
       monthEnd: payload.useMonthEnd ? 1 : 0,
+      trackAsDebt: payload.trackAsDebt ? 1 : 0,
     })
 
   const id = Number(result.lastInsertRowid)
+  if (payload.trackAsDebt) {
+    const now = new Date().toISOString()
+    db.prepare(
+      `INSERT INTO debt_sources (entry_id, enabled, created_at, updated_at)
+       VALUES (?, 1, ?, ?)
+       ON CONFLICT(entry_id) DO UPDATE SET enabled = 1, updated_at = excluded.updated_at`,
+    ).run(id, now, now)
+  }
   if (automaticRule) recordCategorizationMatch(db, automaticRule.ruleId)
   setResponseStatus(event, 201)
 

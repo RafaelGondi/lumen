@@ -6,6 +6,7 @@ const tabs = [
   { label: 'Evolução', to: '/relatorios/evolucao' },
   { label: 'Comparação', to: '/relatorios/comparacao' },
   { label: 'Ritmo de gastos', to: '/relatorios/ritmo-gastos' },
+  { label: 'Dívidas', to: '/relatorios/dividas' },
   { label: 'Projeção', to: '/relatorios/projecao' },
   { label: 'Por categoria', to: '/relatorios/categorias' },
 ]
