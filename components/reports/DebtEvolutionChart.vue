@@ -15,7 +15,11 @@ import {
   type ChartOptions,
 } from 'chart.js'
 import { Chart as VueChart } from 'vue-chartjs'
-import type { DebtEvolutionPoint, DebtMonthlyImpact } from '~/types/debtEvolution'
+import type {
+  DebtCashProjectionPoint,
+  DebtEvolutionPoint,
+  DebtMonthlyImpact,
+} from '~/types/debtEvolution'
 
 ChartJS.register(
   CategoryScale,
@@ -33,13 +37,18 @@ ChartJS.register(
 const props = defineProps<{
   points: DebtEvolutionPoint[]
   monthlyImpacts: DebtMonthlyImpact[]
+  cashProjection: DebtCashProjectionPoint[]
+  breakEvenMonth: string | null
+  breakEvenLabel: string | null
 }>()
 
 const wrapRef = ref<HTMLElement | null>(null)
 const showMonthlyImpact = ref(false)
+const showCashProjection = ref(false)
 const tokens = ref({
   actual: '#315b78',
   projected: '#8b6d47',
+  cash: '#2f7d5c',
   actualSoft: 'rgba(49, 91, 120, 0.14)',
   ink: '#213129',
   muted: '#67736b',
@@ -55,6 +64,7 @@ onMounted(() => {
   tokens.value = {
     actual: read('--debt-actual', tokens.value.actual),
     projected: read('--debt-projected', tokens.value.projected),
+    cash: read('--debt-cash', tokens.value.cash),
     actualSoft: read('--debt-actual-soft', tokens.value.actualSoft),
     ink: read('--color-ink', tokens.value.ink),
     muted: read('--color-ink-muted', tokens.value.muted),
@@ -71,6 +81,9 @@ const todayBalance = computed(() =>
 )
 const impactByMonth = computed(() => new Map(
   props.monthlyImpacts.map((impact) => [impact.month, impact]),
+))
+const cashByMonth = computed(() => new Map(
+  props.cashProjection.map((point) => [point.month, point.balance]),
 ))
 const timeline = computed(() => [
   ...props.points
@@ -105,6 +118,31 @@ const chartData = computed<ChartData<'line' | 'bar'>>(() => ({
       maxBarThickness: 34,
       yAxisID: 'impact',
       order: 3,
+    }] : []),
+    ...(showCashProjection.value ? [{
+      type: 'line' as const,
+      label: 'Pior saldo projetado',
+      data: timeline.value.map((item) =>
+        item.kind === 'projected'
+          ? cashByMonth.value.get(item.month) ?? null
+          : null,
+      ),
+      borderColor: tokens.value.cash,
+      backgroundColor: 'transparent',
+      borderWidth: 2.25,
+      borderDash: [3, 4],
+      fill: false,
+      pointRadius: timeline.value.map((item) =>
+        item.kind === 'projected' && item.month === props.breakEvenMonth ? 6 : 3,
+      ),
+      pointHoverRadius: 6,
+      pointBackgroundColor: tokens.value.cash,
+      pointBorderColor: tokens.value.surface,
+      pointBorderWidth: 1.5,
+      spanGaps: true,
+      cubicInterpolationMode: 'monotone' as const,
+      yAxisID: 'balance',
+      order: 2,
     }] : []),
     {
       type: 'line' as const,
@@ -171,6 +209,12 @@ const options = computed<ChartOptions<'line' | 'bar'>>(() => ({
           const point = timeline.value[context.dataIndex]
           if (context.dataset.label === 'Impacto mensal') {
             return `Impacto no mês: ${formatMoney(Number(context.raw))}`
+          }
+          if (context.dataset.label === 'Pior saldo projetado') {
+            const suffix = point?.month === props.breakEvenMonth
+              ? ' · break-even'
+              : ''
+            return `Pior saldo projetado: ${formatMoney(Number(context.raw))}${suffix}`
           }
           if (point?.kind === 'actual') {
             return `${point.label === 'Hoje' ? 'Saldo hoje' : 'Saldo registrado'}: ${formatMoney(Number(context.raw))}`
@@ -268,6 +312,13 @@ function formatAxis(value: number) {
           <small>Parcelas e faturas que incidem em cada mês.</small>
         </span>
       </label>
+      <label>
+        <input v-model="showCashProjection" type="checkbox" />
+        <span>
+          <strong>Cruzar com projeção do saldo</strong>
+          <small>Usa o pior saldo previsto de cada mês.</small>
+        </span>
+      </label>
     </div>
     <div class="debt-chart__plot">
       <ClientOnly>
@@ -280,8 +331,17 @@ function formatAxis(value: number) {
     <ul class="debt-chart__legend" aria-label="Legenda do gráfico">
       <li><i class="is-actual" />Saldo registrado (histórico e hoje)</li>
       <li><i class="is-projected" />Projeção pelos compromissos conhecidos</li>
+      <li v-if="showCashProjection"><i class="is-cash" />Pior saldo projetado</li>
       <li v-if="showMonthlyImpact"><i class="is-impact" />Impacto mensal</li>
     </ul>
+    <p v-if="showCashProjection" class="debt-chart__break-even">
+      <template v-if="breakEvenLabel">
+        Break-even estimado em {{ breakEvenLabel }}: a projeção de saldo passa a cobrir a dívida restante.
+      </template>
+      <template v-else>
+        O saldo projetado não cobre a dívida restante dentro do horizonte conhecido.
+      </template>
+    </p>
   </div>
 </template>
 
@@ -289,6 +349,7 @@ function formatAxis(value: number) {
 .debt-chart {
   --debt-actual: #315b78;
   --debt-projected: #a17740;
+  --debt-cash: #2f7d5c;
   --debt-actual-soft: rgb(49 91 120 / 12%);
 }
 
@@ -299,6 +360,8 @@ function formatAxis(value: number) {
 .debt-chart__toolbar {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-4);
   margin-bottom: var(--space-3);
 }
 
@@ -363,6 +426,18 @@ function formatAxis(value: number) {
   border: 1px solid var(--debt-projected);
   border-radius: 2px;
   background: rgb(161 119 64 / 18%);
+}
+
+.debt-chart__legend i.is-cash {
+  border-top-color: var(--debt-cash);
+  border-top-style: dotted;
+}
+
+.debt-chart__break-even {
+  margin-top: var(--space-3);
+  color: var(--color-positive);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
 }
 
 @media (max-width: 640px) {

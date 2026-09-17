@@ -495,6 +495,35 @@ function migrateDebtTracking(database: Database.Database) {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS manual_debts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      creditor TEXT,
+      current_balance REAL NOT NULL CHECK (current_balance >= 0),
+      start_date TEXT NOT NULL,
+      target_date TEXT,
+      category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+      notes TEXT,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS manual_debt_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      debt_id INTEGER NOT NULL REFERENCES manual_debts(id) ON DELETE CASCADE,
+      amount REAL NOT NULL CHECK (amount > 0),
+      payment_date TEXT NOT NULL,
+      account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+      entry_id INTEGER REFERENCES entries(id) ON DELETE SET NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_manual_debt_payments_debt_date
+      ON manual_debt_payments (debt_id, payment_date);
   `)
 
   // Preserva a seleção feita na primeira versão do relatório. Depois dessa

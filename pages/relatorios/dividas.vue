@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Info, Landmark, TrendingDown } from '@lucide/vue'
+import { Info, Landmark, Plus, TrendingDown } from '@lucide/vue'
 import type { DebtEvolutionReport, DebtSourceOption } from '~/types/debtEvolution'
+import type { ManualDebt } from '~/types/manualDebt'
 
 const {
   data: report,
@@ -13,6 +14,10 @@ const {
 
 const selectedIds = ref<number[]>([])
 const selectedCardIds = ref<number[]>([])
+const selectedManualDebtIds = ref<number[]>([])
+const debtDrawerOpen = ref(false)
+const paymentDrawerOpen = ref(false)
+const paymentDebt = ref<ManualDebt | null>(null)
 const saving = ref(false)
 const saveError = ref('')
 const saved = ref(false)
@@ -24,6 +29,9 @@ watch(report, (value) => {
   selectedCardIds.value = value?.cards
     .filter((card) => card.enabled)
     .map((card) => card.cardId) ?? []
+  selectedManualDebtIds.value = value?.manualDebts
+    .filter((debt) => debt.enabled)
+    .map((debt) => debt.id) ?? []
 }, { immediate: true })
 
 const sourceGroups = computed(() => ({
@@ -38,9 +46,14 @@ const allSourcesSelected = computed(() =>
   Boolean(report.value?.sources.length) &&
   report.value!.sources.every((source) => selectedIds.value.includes(source.entryId)),
 )
+const allManualDebtsSelected = computed(() =>
+  Boolean(report.value?.manualDebts.length) &&
+  report.value!.manualDebts.every((debt) => selectedManualDebtIds.value.includes(debt.id)),
+)
 const everythingSelected = computed(() =>
   allCardsSelected.value &&
-  (report.value?.sources.length ? allSourcesSelected.value : true),
+  (report.value?.sources.length ? allSourcesSelected.value : true) &&
+  (report.value?.manualDebts.length ? allManualDebtsSelected.value : true),
 )
 
 function toggleSource(entryId: number) {
@@ -57,6 +70,13 @@ function toggleCard(cardId: number) {
   saved.value = false
 }
 
+function toggleManualDebt(debtId: number) {
+  selectedManualDebtIds.value = selectedManualDebtIds.value.includes(debtId)
+    ? selectedManualDebtIds.value.filter((id) => id !== debtId)
+    : [...selectedManualDebtIds.value, debtId]
+  saved.value = false
+}
+
 function toggleAllCards() {
   selectedCardIds.value = allCardsSelected.value
     ? []
@@ -68,10 +88,12 @@ function toggleEverything() {
   if (everythingSelected.value) {
     selectedCardIds.value = []
     selectedIds.value = []
+    selectedManualDebtIds.value = []
   }
   else {
     selectedCardIds.value = report.value?.cards.map((card) => card.cardId) ?? []
     selectedIds.value = report.value?.sources.map((source) => source.entryId) ?? []
+    selectedManualDebtIds.value = report.value?.manualDebts.map((debt) => debt.id) ?? []
   }
   saved.value = false
 }
@@ -86,6 +108,7 @@ async function saveSources() {
       body: {
         entryIds: selectedIds.value,
         cardIds: selectedCardIds.value,
+        manualDebtIds: selectedManualDebtIds.value,
       },
     })
     await refresh()
@@ -97,6 +120,15 @@ async function saveSources() {
   finally {
     saving.value = false
   }
+}
+
+function openPayment(debt: ManualDebt) {
+  paymentDebt.value = debt
+  paymentDrawerOpen.value = true
+}
+
+async function handleDebtChange() {
+  await refresh()
 }
 
 function sourceSupport(source: DebtSourceOption) {
@@ -160,7 +192,7 @@ function formatMonth(month: string | null) {
           </UiCard>
           <UiCard class="debt-kpi debt-kpi--estimate">
             <span class="debt-kpi__label">Quitação estimada</span>
-            <strong class="debt-kpi__value debt-kpi__text">{{ report.estimatedPayoffLabel ?? 'Após o horizonte' }}</strong>
+            <strong class="debt-kpi__value debt-kpi__text">{{ report.hasOpenEndedDebt ? 'Sem previsão' : report.estimatedPayoffLabel ?? 'Após o horizonte' }}</strong>
             <small class="debt-kpi__support">considerando apenas compromissos conhecidos</small>
           </UiCard>
         </template>
@@ -189,6 +221,9 @@ function formatMonth(month: string | null) {
             v-else-if="report"
             :points="report.points"
             :monthly-impacts="report.monthlyImpacts"
+            :cash-projection="report.cashProjection"
+            :break-even-month="report.breakEvenMonth"
+            :break-even-label="report.breakEvenLabel"
           />
         </div>
         <p v-if="report && !report.historyStarted" class="debt-history-note">
@@ -226,7 +261,7 @@ function formatMonth(month: string | null) {
                 </span>
                 <div class="debt-composition__name">
                   <strong>{{ item.name }}</strong>
-                  <span>{{ item.support }} · até {{ formatMonth(item.payoffMonth) }}</span>
+                  <span>{{ item.support }} · {{ item.payoffMonth ? `até ${formatMonth(item.payoffMonth)}` : 'sem previsão' }}</span>
                 </div>
                 <div class="debt-composition__value">
                   <strong><UiMoney :value="item.balance" /></strong>
@@ -251,12 +286,24 @@ function formatMonth(month: string | null) {
               <h2>O que acompanhar</h2>
               <p>Escolha os cartões e demais compromissos que entram no relatório.</p>
             </div>
-            <button type="button" class="debt-sources__select-all" @click="toggleEverything">
-              {{ everythingSelected ? 'Limpar tudo' : 'Selecionar tudo' }}
-            </button>
+            <div class="debt-sources__actions">
+              <button type="button" class="debt-sources__select-all" @click="toggleEverything">{{ everythingSelected ? 'Limpar tudo' : 'Selecionar tudo' }}</button>
+              <UiButton size="sm" @click="debtDrawerOpen = true"><Plus aria-hidden="true" />Adicionar dívida</UiButton>
+            </div>
           </header>
 
-          <div v-if="report.cards.length || report.sources.length" class="debt-sources__options">
+          <div v-if="report.cards.length || report.sources.length || report.manualDebts.length" class="debt-sources__options">
+            <p v-if="report.manualDebts.length" class="debt-sources__label">Dívidas sem parcelas</p>
+            <div v-for="debt in report.manualDebts" :key="`manual:${debt.id}`" class="debt-source debt-source--manual">
+              <label>
+                <input type="checkbox" :checked="selectedManualDebtIds.includes(debt.id)" @change="toggleManualDebt(debt.id)">
+                <CategoriesCategoryIconChip v-if="debt.categoryIcon" :icon="debt.categoryIcon" :color="debt.categoryColor ?? '#647a91'" size="md" />
+                <span v-else class="debt-source__fallback"><Landmark aria-hidden="true" /></span>
+                <span><strong>{{ debt.name }}</strong><small>{{ debt.creditor || 'Sem credor informado' }} · <UiMoney :value="debt.currentBalance" /></small></span>
+              </label>
+              <button type="button" class="debt-source__payment" @click="openPayment(debt)">Registrar pagamento</button>
+            </div>
+
             <p v-if="report.cards.length" class="debt-sources__label">Cartões</p>
             <label v-if="report.cards.length" class="debt-source debt-source--all">
               <input
@@ -355,6 +402,9 @@ function formatMonth(month: string | null) {
         </UiCard>
       </div>
     </template>
+
+    <ReportsManualDebtFormDrawer v-model:open="debtDrawerOpen" @saved="handleDebtChange" />
+    <ReportsManualDebtPaymentDrawer v-model:open="paymentDrawerOpen" :debt="paymentDebt" @saved="handleDebtChange" />
   </div>
 </template>
 
@@ -432,6 +482,8 @@ function formatMonth(month: string | null) {
 }
 
 .debt-sources .debt-section-header > div { flex: 1; }
+.debt-sources__actions { display: flex; flex: none !important; align-items: center; gap: var(--space-3); }
+.debt-sources__actions :deep(.ak-button svg) { width: 0.95rem; height: 0.95rem; }
 .debt-sources__select-all {
   flex: none;
   padding: 0;
@@ -537,6 +589,37 @@ function formatMonth(month: string | null) {
 
 .debt-source:hover { background: var(--color-surface-subtle); }
 .debt-source--all { background: var(--color-surface-subtle); }
+.debt-source--manual {
+  display: flex;
+  justify-content: space-between;
+  cursor: default;
+}
+.debt-source--manual > label {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+}
+.debt-source--manual label > span strong,
+.debt-source--manual label > span small { display: block; }
+.debt-source--manual label > span strong { color: var(--color-ink); font-size: var(--text-sm); }
+.debt-source--manual label > span small { margin-top: .15rem; color: var(--color-ink-muted); font-size: var(--text-xs); }
+.debt-source__payment {
+  flex: none;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-brand);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+.debt-source__payment:hover { background: var(--color-brand-soft); }
 .debt-source input { width: 1rem; height: 1rem; accent-color: var(--color-brand); }
 .debt-source > span strong,
 .debt-source > span small { display: block; }
@@ -585,6 +668,9 @@ function formatMonth(month: string | null) {
 
 @media (max-width: 640px) {
   .debt-kpis { grid-template-columns: 1fr; }
+  .debt-sources__actions { align-items: flex-end; flex-direction: column; }
+  .debt-source--manual { align-items: stretch; flex-direction: column; }
+  .debt-source__payment { align-self: flex-start; margin-left: 4.75rem; }
   .debt-section-header,
   .debt-chart-card__body,
   .debt-composition__list li,

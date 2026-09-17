@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3'
 import type { Card } from '~/types/card'
 import type {
   DebtEvolutionItem,
+  DebtCashProjectionPoint,
   DebtMonthlyImpact,
   DebtEvolutionPoint,
   DebtEvolutionReport,
@@ -9,9 +10,11 @@ import type {
   DebtSourceOption,
 } from '~/types/debtEvolution'
 import type { EntryOccurrence } from '~/types/entry'
+import type { ManualDebt } from '~/types/manualDebt'
 import { addMonthsLocal, roundMoney } from '~/utils/dateMoney'
 import { cardUsageSummary } from './cardInvoice'
 import { occurrencesForCompetenceMonth } from './occurrences'
+import { buildProjectionPoints } from './projection'
 
 const MONTH_SHORT = [
   'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
@@ -28,6 +31,8 @@ type EntryCandidateRow = Omit<DebtSourceOption, 'enabled' | 'suggested'> & {
 type CardRow = Omit<Card, 'active' | 'usedAmount' | 'estimatedPayoffLabel'> & {
   active: number
 }
+
+type ManualDebtRow = Omit<ManualDebt, 'enabled'> & { enabled: number }
 
 function shiftMonth(month: string, offset: number) {
   return addMonthsLocal(`${month}-01`, offset).slice(0, 7)
@@ -162,6 +167,43 @@ export function saveDebtCardSources(db: Database.Database, cardIds: number[]) {
   })()
 }
 
+export function loadManualDebtOptions(db: Database.Database): ManualDebt[] {
+  const rows = db.prepare(
+    `SELECT d.id, d.name, d.creditor, d.current_balance AS currentBalance,
+            d.start_date AS startDate, d.target_date AS targetDate,
+            d.category_id AS categoryId, c.name AS categoryName,
+            c.color AS categoryColor, c.icon AS categoryIcon,
+            d.notes, d.enabled
+     FROM manual_debts d
+     LEFT JOIN categories c ON c.id = d.category_id
+     WHERE d.active = 1
+     ORDER BY d.name COLLATE NOCASE`,
+  ).all() as ManualDebtRow[]
+  return rows.map((row) => ({
+    ...row,
+    currentBalance: roundMoney(row.currentBalance),
+    enabled: Boolean(row.enabled),
+  }))
+}
+
+export function saveManualDebtSources(db: Database.Database, debtIds: number[]) {
+  const options = loadManualDebtOptions(db)
+  const allowed = new Set(options.map((option) => option.id))
+  if (debtIds.some((id) => !allowed.has(id))) {
+    throw createError({ statusCode: 400, statusMessage: 'Dívida avulsa inválida.' })
+  }
+  const selected = new Set(debtIds)
+  const now = new Date().toISOString()
+  const update = db.prepare(
+    'UPDATE manual_debts SET enabled = ?, updated_at = ? WHERE id = ?',
+  )
+  db.transaction(() => {
+    for (const option of options) {
+      update.run(selected.has(option.id) ? 1 : 0, now, option.id)
+    }
+  })()
+}
+
 function loadCards(db: Database.Database) {
   const rows = db.prepare(
     `SELECT id, name, bank_key AS bankKey, bank_name AS bankName, color,
@@ -196,6 +238,8 @@ export function buildDebtEvolutionReport(db: Database.Database): DebtEvolutionRe
   const currentMonth = today.slice(0, 7)
   const sources = loadDebtSourceOptions(db)
   const selected = sources.filter((source) => source.enabled)
+  const manualDebts = loadManualDebtOptions(db)
+  const selectedManualDebts = manualDebts.filter((debt) => debt.enabled)
   const selectedIds = new Set(selected.map((source) => source.entryId))
   const cardSources = loadDebtCardSourceOptions(db)
   const selectedCardIds = new Set(
@@ -219,10 +263,13 @@ export function buildDebtEvolutionReport(db: Database.Database): DebtEvolutionRe
     .map(payoffMonthForSource)
     .filter((month): month is string => Boolean(month))
   const lastCardMonth = [...openCardMonths].reverse().find((item) => item.amount > 0)?.month
-  const furthest = [...payoffMonths, ...(lastCardMonth ? [lastCardMonth] : [])]
+  const manualTargetMonths = selectedManualDebts
+    .map((debt) => debt.targetDate?.slice(0, 7))
+    .filter((month): month is string => Boolean(month))
+  const furthest = [...payoffMonths, ...manualTargetMonths, ...(lastCardMonth ? [lastCardMonth] : [])]
     .sort()
     .at(-1) ?? shiftMonth(currentMonth, 12)
-  const rawHorizon = Math.max(12, Math.min(60,
+  const rawHorizon = Math.max(18, Math.min(60,
     (Number(furthest.slice(0, 4)) - Number(currentMonth.slice(0, 4))) * 12 +
     Number(furthest.slice(5, 7)) - Number(currentMonth.slice(5, 7)),
   ))
@@ -247,13 +294,17 @@ export function buildDebtEvolutionReport(db: Database.Database): DebtEvolutionRe
   )
   const cardTotal = roundMoney(cardItems.reduce((sum, item) => sum + item.usedAmount, 0))
   const entryTotal = roundMoney(selected.reduce((sum, source) => sum + entryBalance(source.entryId), 0))
-  const currentTotal = roundMoney(cardTotal + entryTotal)
+  const manualTotal = roundMoney(selectedManualDebts.reduce((sum, debt) => sum + debt.currentBalance, 0))
+  const currentTotal = roundMoney(cardTotal + entryTotal + manualTotal)
 
   const dueEntriesThisMonth = occurrences
     .filter((item) => item.dueDate.slice(0, 7) === currentMonth)
     .reduce((sum, item) => sum + item.amount, 0)
   const dueCardsThisMonth = openCardMonths.find((item) => item.month === currentMonth)?.amount ?? 0
-  const dueThisMonth = roundMoney(dueEntriesThisMonth + dueCardsThisMonth)
+  const dueManualThisMonth = selectedManualDebts
+    .filter((debt) => debt.targetDate?.slice(0, 7) === currentMonth)
+    .reduce((sum, debt) => sum + debt.currentBalance, 0)
+  const dueThisMonth = roundMoney(dueEntriesThisMonth + dueCardsThisMonth + dueManualThisMonth)
 
   const monthlyImpacts: DebtMonthlyImpact[] = occurrenceMonths.map((month) => {
     const cardImpact = cardItems.map(({ card, projection }) => ({
@@ -276,7 +327,14 @@ export function buildDebtEvolutionReport(db: Database.Database): DebtEvolutionRe
       type: 'entry' as const,
       color: source.categoryColor ?? '#647a91',
     }))
-    const items = [...cardImpact, ...entryImpact]
+    const manualImpact = selectedManualDebts.map((debt) => ({
+      id: `manual:${debt.id}`,
+      name: debt.name,
+      amount: debt.targetDate?.slice(0, 7) === month ? debt.currentBalance : 0,
+      type: 'manual' as const,
+      color: debt.categoryColor ?? '#647a91',
+    }))
+    const items = [...cardImpact, ...entryImpact, ...manualImpact]
       .filter((item) => item.amount > 0)
       .sort((a, b) => b.amount - a.amount)
     return {
@@ -315,6 +373,18 @@ export function buildDebtEvolutionReport(db: Database.Database): DebtEvolutionRe
         categoryIcon: source.categoryIcon,
       }
     }).filter((item) => item.balance > 0),
+    ...selectedManualDebts.map((debt) => ({
+      id: `manual:${debt.id}`,
+      name: debt.name,
+      support: [debt.creditor, debt.categoryName ?? 'Dívida sem parcelas'].filter(Boolean).join(' · '),
+      type: 'manual' as const,
+      balance: debt.currentBalance,
+      percent: percent(debt.currentBalance, currentTotal),
+      payoffMonth: debt.targetDate?.slice(0, 7) ?? null,
+      bankKey: null,
+      color: debt.categoryColor ?? '#647a91',
+      categoryIcon: debt.categoryIcon,
+    })).filter((item) => item.balance > 0),
   ].sort((a, b) => b.balance - a.balance)
 
   const breakdownJson = JSON.stringify(composition.map((item) => ({ id: item.id, balance: item.balance })))
@@ -351,7 +421,10 @@ export function buildDebtEvolutionReport(db: Database.Database): DebtEvolutionRe
     const entriesRemaining = occurrences
       .filter((item) => item.dueDate.slice(0, 7) > month)
       .reduce((sum, item) => sum + item.amount, 0)
-    return roundMoney(cardsRemaining + entriesRemaining)
+    const manualRemaining = selectedManualDebts
+      .filter((debt) => !debt.targetDate || debt.targetDate.slice(0, 7) > month)
+      .reduce((sum, debt) => sum + debt.currentBalance, 0)
+    return roundMoney(cardsRemaining + entriesRemaining + manualRemaining)
   }
   for (const month of occurrenceMonths) {
     points.push({
@@ -364,8 +437,25 @@ export function buildDebtEvolutionReport(db: Database.Database): DebtEvolutionRe
   }
 
   const projected = points.filter((point) => point.kind === 'projected')
+  const projectedDebtByMonth = new Map(
+    projected.map((point) => [point.month, point.balance]),
+  )
+  const cashProjection: DebtCashProjectionPoint[] = buildProjectionPoints(
+    db,
+    currentMonth,
+    occurrenceMonths.length,
+  ).map((point) => ({
+    month: point.month,
+    label: monthLabel(point.month),
+    balance: roundMoney(point.worstBalance ?? point.balance),
+  }))
+  const breakEvenPoint = cashProjection.find((point) => {
+    const debtBalance = projectedDebtByMonth.get(point.month)
+    return debtBalance !== undefined && point.balance >= debtBalance
+  })
   const payoffPoint = projected.find((point) => point.balance <= 0.005)
-  const estimatedPayoffMonth = payoffPoint?.month ?? null
+  const hasOpenEndedDebt = selectedManualDebts.some((debt) => debt.currentBalance > 0 && !debt.targetDate)
+  const estimatedPayoffMonth = hasOpenEndedDebt ? null : payoffPoint?.month ?? null
   const endCurrentMonth = projected.find((point) => point.month === currentMonth)?.balance ?? currentTotal
 
   return {
@@ -378,8 +468,15 @@ export function buildDebtEvolutionReport(db: Database.Database): DebtEvolutionRe
     historyStarted: snapshots.length > 0,
     points,
     monthlyImpacts,
+    cashProjection,
+    breakEvenMonth: breakEvenPoint?.month ?? null,
+    breakEvenLabel: breakEvenPoint
+      ? monthLabel(breakEvenPoint.month, true)
+      : null,
+    hasOpenEndedDebt,
     composition,
     sources,
     cards: cardSources,
+    manualDebts,
   }
 }

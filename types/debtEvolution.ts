@@ -1,4 +1,5 @@
 import type { BankKey } from './account'
+import type { ManualDebt } from './manualDebt'
 
 export interface DebtSourceOption {
   entryId: number
@@ -36,7 +37,7 @@ export interface DebtEvolutionItem {
   id: string
   name: string
   support: string
-  type: 'card' | 'entry'
+  type: 'card' | 'entry' | 'manual'
   balance: number
   percent: number
   payoffMonth: string | null
@@ -49,7 +50,7 @@ export interface DebtMonthlyImpactItem {
   id: string
   name: string
   amount: number
-  type: 'card' | 'entry'
+  type: 'card' | 'entry' | 'manual'
   color: string
 }
 
@@ -58,6 +59,12 @@ export interface DebtMonthlyImpact {
   label: string
   total: number
   items: DebtMonthlyImpactItem[]
+}
+
+export interface DebtCashProjectionPoint {
+  month: string
+  label: string
+  balance: number
 }
 
 export interface DebtEvolutionReport {
@@ -70,7 +77,12 @@ export interface DebtEvolutionReport {
   historyStarted: boolean
   points: DebtEvolutionPoint[]
   monthlyImpacts: DebtMonthlyImpact[]
+  cashProjection: DebtCashProjectionPoint[]
+  breakEvenMonth: string | null
+  breakEvenLabel: string | null
+  hasOpenEndedDebt: boolean
   composition: DebtEvolutionItem[]
   sources: DebtSourceOption[]
   cards: DebtCardSourceOption[]
+  manualDebts: ManualDebt[]
 }
