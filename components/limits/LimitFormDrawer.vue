@@ -25,6 +25,7 @@ const {
 const recurring = ref(false)
 const saving = ref(false)
 const removing = ref(false)
+const removeDialogOpen = ref(false)
 const errorMessage = ref('')
 
 watch(
@@ -91,13 +92,18 @@ function extractFetchError(error: unknown) {
   return 'Não foi possível salvar o limite.'
 }
 
-async function remove() {
+function remove() {
   if (!props.row?.limitId) return
-  if (!window.confirm(`Remover o limite de "${props.row.label}"?`)) return
+  removeDialogOpen.value = true
+}
+
+async function confirmRemoval() {
+  if (!props.row?.limitId) return
 
   removing.value = true
   try {
     await $fetch(`/api/limits/${props.row.limitId}`, { method: 'DELETE' })
+    removeDialogOpen.value = false
     open.value = false
     emit('saved')
   } finally {
@@ -168,6 +174,15 @@ async function remove() {
       </div>
     </form>
   </UiDrawer>
+
+  <UiConfirmDialog
+    v-model:open="removeDialogOpen"
+    title="Remover limite"
+    :description="`Remover o limite de ${row?.label ?? 'este item'}?`"
+    confirm-label="Remover limite"
+    :busy="removing"
+    @confirm="confirmRemoval"
+  />
 </template>
 
 <style scoped>

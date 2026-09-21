@@ -11,6 +11,7 @@ const navigation = [
   { label: 'Orçamento', to: '/limites' },
   { label: 'Contas', to: '/contas' },
   { label: 'Cartões', to: '/cartoes' },
+  { label: 'Patrimônio', to: '/patrimonio' },
   { label: 'Relatórios', to: '/relatorios' },
 ]
 

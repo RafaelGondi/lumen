@@ -375,6 +375,7 @@ function movementMeta(movement: CashFlowMovement) {
         <ReportsCashFlowChart
           v-else-if="report"
           :days="report.days"
+          :opening-balance="report.openingBalance"
           :snapshot="report.snapshot"
           :selected-date="selectedDate"
           :critical-threshold="report.criticalThreshold"

@@ -255,7 +255,7 @@ export default defineEventHandler(async (event) => {
       ? monthEndLocal(values.date)
       : values.date
     const seriesStartDate =
-      occurrence.occurrenceIndex === 1
+      body.scope === 'future' || occurrence.occurrenceIndex === 1
         ? editedOccurrenceDate
         : parent.useMonthEnd
           ? monthEndLocal(parent.date)

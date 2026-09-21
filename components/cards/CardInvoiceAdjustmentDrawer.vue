@@ -15,6 +15,7 @@ const amountText = ref('0,00')
 const errorMessage = ref('')
 const saving = ref(false)
 const removing = ref(false)
+const removeDialogOpen = ref(false)
 
 const amountValue = computed(() => parseSignedMoney(amountText.value))
 const previewTotal = computed(() => {
@@ -143,9 +144,13 @@ async function save() {
   }
 }
 
-async function remove() {
+function remove() {
   if (!hasExisting.value) return
-  if (!window.confirm('Remover o ajuste desta fatura?')) return
+  removeDialogOpen.value = true
+}
+
+async function confirmRemoval() {
+  if (!hasExisting.value) return
 
   removing.value = true
   errorMessage.value = ''
@@ -154,6 +159,7 @@ async function remove() {
       `/api/cards/${props.card.id}/invoice/adjustment?month=${props.invoice.month}`,
       { method: 'DELETE' },
     )
+    removeDialogOpen.value = false
     open.value = false
     emit('saved')
   } catch (error) {
@@ -253,6 +259,15 @@ async function remove() {
       </UiButton>
     </template>
   </UiDrawer>
+
+  <UiConfirmDialog
+    v-model:open="removeDialogOpen"
+    title="Remover ajuste"
+    description="Remover o ajuste desta fatura? O total será recalculado."
+    confirm-label="Remover ajuste"
+    :busy="removing"
+    @confirm="confirmRemoval"
+  />
 </template>
 
 <style scoped>

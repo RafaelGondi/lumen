@@ -70,6 +70,9 @@ const deleteDialogOpen = ref(false)
 const pendingDeleteExpense = ref<CardInvoiceDetail['entries'][number] | null>(
   null,
 )
+const creditDeleteDialogOpen = ref(false)
+const pendingDeleteCredit = ref<InvoiceCredit | null>(null)
+const removingCredit = ref(false)
 const editingExpense = ref<CardInvoiceDetail['entries'][number] | null>(null)
 const duplicatingExpense = ref<CardInvoiceDetail['entries'][number] | null>(
   null,
@@ -617,13 +620,25 @@ async function confirmDeleteExpense(scope: EntrySeriesScope) {
   await refreshInvoice()
 }
 
-async function removeCredit(credit: InvoiceCredit) {
-  if (!window.confirm(`Remover o estorno "${credit.description}"?`)) return
-  await $fetch(
-    `/api/cards/${cardId.value}/invoice/credits/${credit.id}`,
-    { method: 'DELETE' },
-  )
-  await Promise.all([refreshInvoice(), refreshCard()])
+function removeCredit(credit: InvoiceCredit) {
+  pendingDeleteCredit.value = credit
+  creditDeleteDialogOpen.value = true
+}
+
+async function confirmCreditRemoval() {
+  if (!pendingDeleteCredit.value) return
+  removingCredit.value = true
+  try {
+    await $fetch(
+      `/api/cards/${cardId.value}/invoice/credits/${pendingDeleteCredit.value.id}`,
+      { method: 'DELETE' },
+    )
+    creditDeleteDialogOpen.value = false
+    pendingDeleteCredit.value = null
+    await Promise.all([refreshInvoice(), refreshCard()])
+  } finally {
+    removingCredit.value = false
+  }
 }
 
 function cancelDeleteExpense() {
@@ -1222,6 +1237,15 @@ async function onInvoiceCreditSaved() {
         confirm-label="Excluir"
         @confirm="confirmDeleteExpense"
         @cancel="cancelDeleteExpense"
+      />
+      <UiConfirmDialog
+        v-model:open="creditDeleteDialogOpen"
+        title="Remover estorno"
+        :description="`Remover o estorno ${pendingDeleteCredit?.description ?? ''} desta fatura?`"
+        confirm-label="Remover estorno"
+        :busy="removingCredit"
+        @confirm="confirmCreditRemoval"
+        @cancel="pendingDeleteCredit = null"
       />
     </div>
   </div>

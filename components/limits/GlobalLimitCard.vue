@@ -137,10 +137,26 @@ async function saveGlobal() {
   }
 }
 
-async function removeGlobal(id: number) {
-  if (!window.confirm('Remover este limite global?')) return
-  await $fetch(`/api/limits/global/${id}`, { method: 'DELETE' })
-  emit('saved')
+const removeDialogOpen = ref(false)
+const pendingRemovalId = ref<number | null>(null)
+const removing = ref(false)
+
+function removeGlobal(id: number) {
+  pendingRemovalId.value = id
+  removeDialogOpen.value = true
+}
+
+async function confirmGlobalRemoval() {
+  if (pendingRemovalId.value === null) return
+  removing.value = true
+  try {
+    await $fetch(`/api/limits/global/${pendingRemovalId.value}`, { method: 'DELETE' })
+    removeDialogOpen.value = false
+    pendingRemovalId.value = null
+    emit('saved')
+  } finally {
+    removing.value = false
+  }
 }
 </script>
 
@@ -291,6 +307,16 @@ async function removeGlobal(id: number) {
       </div>
     </form>
   </UiCard>
+
+  <UiConfirmDialog
+    v-model:open="removeDialogOpen"
+    title="Remover limite global"
+    description="Remover este limite global?"
+    confirm-label="Remover limite"
+    :busy="removing"
+    @confirm="confirmGlobalRemoval"
+    @cancel="pendingRemovalId = null"
+  />
 </template>
 
 <style scoped>

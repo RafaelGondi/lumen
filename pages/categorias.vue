@@ -118,6 +118,13 @@ const supercategoryDrawerOpen = ref(false)
 const editingSupercategory = ref<Supercategory | null>(null)
 const ruleDrawerOpen = ref(false)
 const editingRule = ref<CategorizationRule | null>(null)
+type PendingDeletion =
+  | { kind: 'category'; item: Category }
+  | { kind: 'supercategory'; item: Supercategory }
+  | { kind: 'rule'; item: CategorizationRule }
+const deleteDialogOpen = ref(false)
+const pendingDeletion = ref<PendingDeletion | null>(null)
+const deleting = ref(false)
 
 function openCategoryDrawer(category: Category | null) {
   editingCategory.value = category
@@ -142,25 +149,14 @@ async function refreshAll() {
   ])
 }
 
-async function removeCategory(category: Category) {
-  if (!window.confirm(`Excluir a categoria "${category.name}"?`)) return
-
-  await $fetch(`/api/categories/${category.id}`, { method: 'DELETE' })
-  await refreshAll()
+function removeCategory(category: Category) {
+  pendingDeletion.value = { kind: 'category', item: category }
+  deleteDialogOpen.value = true
 }
 
-async function removeSupercategory(supercategory: Supercategory) {
-  const warning =
-    supercategory.categories.length > 0
-      ? `Excluir "${supercategory.name}"? As ${supercategory.categories.length} categorias associadas ficarão sem supercategoria.`
-      : `Excluir a supercategoria "${supercategory.name}"?`
-
-  if (!window.confirm(warning)) return
-
-  await $fetch(`/api/supercategories/${supercategory.id}`, {
-    method: 'DELETE',
-  })
-  await refreshAll()
+function removeSupercategory(supercategory: Supercategory) {
+  pendingDeletion.value = { kind: 'supercategory', item: supercategory }
+  deleteDialogOpen.value = true
 }
 
 async function toggleRule(rule: CategorizationRule) {
@@ -178,10 +174,48 @@ async function toggleRule(rule: CategorizationRule) {
   await refreshRules()
 }
 
-async function removeRule(rule: CategorizationRule) {
-  if (!window.confirm(`Excluir a regra para “${rule.pattern}”?`)) return
-  await $fetch(`/api/categorization-rules/${rule.id}`, { method: 'DELETE' })
-  await refreshRules()
+function removeRule(rule: CategorizationRule) {
+  pendingDeletion.value = { kind: 'rule', item: rule }
+  deleteDialogOpen.value = true
+}
+
+const deleteDialogTitle = computed(() => {
+  if (pendingDeletion.value?.kind === 'category') return 'Excluir categoria'
+  if (pendingDeletion.value?.kind === 'supercategory') return 'Excluir supercategoria'
+  return 'Excluir regra'
+})
+
+const deleteDialogDescription = computed(() => {
+  const pending = pendingDeletion.value
+  if (!pending) return 'Esta ação não pode ser desfeita.'
+  if (pending.kind === 'category') return `Excluir a categoria ${pending.item.name}?`
+  if (pending.kind === 'rule') return `Excluir a regra para “${pending.item.pattern}”?`
+  const count = pending.item.categories.length
+  return count > 0
+    ? `Excluir ${pending.item.name}? As ${count} categorias associadas ficarão sem supercategoria.`
+    : `Excluir a supercategoria ${pending.item.name}?`
+})
+
+async function confirmDeletion() {
+  const pending = pendingDeletion.value
+  if (!pending) return
+  deleting.value = true
+  try {
+    if (pending.kind === 'category') {
+      await $fetch(`/api/categories/${pending.item.id}`, { method: 'DELETE' })
+      await refreshAll()
+    } else if (pending.kind === 'supercategory') {
+      await $fetch(`/api/supercategories/${pending.item.id}`, { method: 'DELETE' })
+      await refreshAll()
+    } else {
+      await $fetch(`/api/categorization-rules/${pending.item.id}`, { method: 'DELETE' })
+      await refreshRules()
+    }
+    deleteDialogOpen.value = false
+    pendingDeletion.value = null
+  } finally {
+    deleting.value = false
+  }
 }
 </script>
 
@@ -391,6 +425,15 @@ async function removeRule(rule: CategorizationRule) {
       :rule="editingRule"
       :categories="categories"
       @saved="refreshRules"
+    />
+    <UiConfirmDialog
+      v-model:open="deleteDialogOpen"
+      :title="deleteDialogTitle"
+      :description="deleteDialogDescription"
+      confirm-label="Excluir"
+      :busy="deleting"
+      @confirm="confirmDeletion"
+      @cancel="pendingDeletion = null"
     />
   </div>
 </template>

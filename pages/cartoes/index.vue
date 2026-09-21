@@ -20,6 +20,9 @@ const {
 
 const drawerOpen = ref(false)
 const editingCard = ref<Card | null>(null)
+const deleteDialogOpen = ref(false)
+const pendingDeletion = ref<Card | null>(null)
+const deleting = ref(false)
 
 const totalLimit = computed(() =>
   roundMoney(cards.value.reduce((sum, card) => sum + card.creditLimit, 0)),
@@ -59,10 +62,22 @@ async function refreshAll() {
   await Promise.all([refresh(), refreshProjection()])
 }
 
-async function removeCard(card: Card) {
-  if (!window.confirm(`Excluir o cartão "${card.name}"?`)) return
-  await $fetch(`/api/cards/${card.id}`, { method: 'DELETE' })
-  await refreshAll()
+function removeCard(card: Card) {
+  pendingDeletion.value = card
+  deleteDialogOpen.value = true
+}
+
+async function confirmCardRemoval() {
+  if (!pendingDeletion.value) return
+  deleting.value = true
+  try {
+    await $fetch(`/api/cards/${pendingDeletion.value.id}`, { method: 'DELETE' })
+    deleteDialogOpen.value = false
+    pendingDeletion.value = null
+    await refreshAll()
+  } finally {
+    deleting.value = false
+  }
 }
 </script>
 
@@ -197,6 +212,15 @@ async function removeCard(card: Card) {
       v-model:open="drawerOpen"
       :card="editingCard"
       @saved="refreshAll"
+    />
+    <UiConfirmDialog
+      v-model:open="deleteDialogOpen"
+      title="Excluir cartão"
+      :description="`Excluir o cartão ${pendingDeletion?.name ?? ''}? Esta ação não pode ser desfeita.`"
+      confirm-label="Excluir cartão"
+      :busy="deleting"
+      @confirm="confirmCardRemoval"
+      @cancel="pendingDeletion = null"
     />
   </div>
 </template>

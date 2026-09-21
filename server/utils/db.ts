@@ -470,6 +470,52 @@ function migrate(database: Database.Database) {
   migrateProjectionScenarios(database)
   migrateCategorizationRules(database)
   migrateDebtTracking(database)
+  migrateAssets(database)
+}
+
+function migrateAssets(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS assets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL
+        CHECK (type IN ('fgts', 'investment', 'reserve', 'property', 'vehicle', 'other')),
+      name TEXT NOT NULL,
+      current_balance REAL NOT NULL CHECK (current_balance >= 0),
+      monthly_contribution REAL NOT NULL DEFAULT 0 CHECK (monthly_contribution >= 0),
+      annual_yield_rate REAL NOT NULL DEFAULT 0
+        CHECK (annual_yield_rate >= 0 AND annual_yield_rate <= 1000),
+      balance_date TEXT NOT NULL,
+      notes TEXT,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_assets_active_type
+      ON assets (active, type, name);
+
+    CREATE TABLE IF NOT EXISTS asset_movements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      asset_id INTEGER NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL CHECK (kind IN (
+        'contribution', 'yield', 'withdrawal',
+        'adjustment_credit', 'adjustment_debit', 'balance_confirmation'
+      )),
+      amount REAL NOT NULL CHECK (amount >= 0),
+      movement_date TEXT NOT NULL,
+      scheduled_date TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_asset_movements_asset_date
+      ON asset_movements (asset_id, movement_date, id);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_asset_movements_schedule_override
+      ON asset_movements (asset_id, kind, scheduled_date)
+      WHERE scheduled_date IS NOT NULL;
+  `)
 }
 
 function migrateDebtTracking(database: Database.Database) {

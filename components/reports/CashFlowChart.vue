@@ -25,6 +25,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, 
 
 const props = defineProps<{
   days: CashFlowDay[]
+  openingBalance: number
   snapshot: CashFlowSnapshot | null
   selectedDate: string | null
   criticalThreshold?: number
@@ -93,8 +94,14 @@ watch(showSnapshot, (visible) => {
   }
 })
 
-const todayIndex = computed(() => props.days.findIndex((d) => d.isToday))
-const selectedIndex = computed(() => props.days.findIndex((d) => d.date === props.selectedDate))
+const todayIndex = computed(() => {
+  const index = props.days.findIndex((d) => d.isToday)
+  return index < 0 ? -1 : index + 1
+})
+const selectedIndex = computed(() => {
+  const index = props.days.findIndex((d) => d.date === props.selectedDate)
+  return index < 0 ? -1 : index + 1
+})
 const snapshotBalances = computed(
   () => new Map(visibleSnapshot.value?.points.map((point) => [point.date, point.balance]) ?? []),
 )
@@ -102,6 +109,7 @@ const snapshotBalances = computed(
 /** Escala com folga só onde importa: embaixo apenas quando há saldo negativo. */
 const yBounds = computed(() => {
   const values = [
+    props.openingBalance,
     ...props.days.map((d) => d.balance),
     ...(visibleSnapshot.value?.points.map((point) => point.balance) ?? []),
   ]
@@ -115,26 +123,28 @@ const yBounds = computed(() => {
   }
 })
 
-const pointRadius = computed(() =>
-  props.days.map((d, i) => {
-    if (i === selectedIndex.value) return 6
+const pointRadius = computed(() => [
+  3,
+  ...props.days.map((d, i) => {
+    if (i + 1 === selectedIndex.value) return 6
     if (d.isToday) return 5
     if (d.isCritical) return 4
     return d.movements.length ? 3 : 0
   }),
-)
+])
 
-const pointColor = computed(() =>
-  props.days.map((d, i) =>
+const pointColor = computed(() => [
+  tokens.value.line,
+  ...props.days.map((d) =>
     d.isCritical ? tokens.value.critical : tokens.value.line,
   ),
-)
+])
 
 const chartData = computed<ChartData<'line'>>(() => {
   const datasets: ChartData<'line'>['datasets'] = [
     {
       label: 'Saldo',
-      data: props.days.map((d) => d.balance),
+      data: [props.openingBalance, ...props.days.map((d) => d.balance)],
       borderColor: tokens.value.line,
       borderWidth: 2,
       /**
@@ -181,9 +191,12 @@ const chartData = computed<ChartData<'line'>>(() => {
   if (visibleSnapshot.value) {
     datasets.push({
       label: 'Previsto no início do mês',
-      data: props.days.map(
-        (day) => snapshotBalances.value.get(day.date) ?? null,
-      ),
+      data: [
+        visibleSnapshot.value.points[0]?.balance ?? null,
+        ...props.days.map(
+          (day) => snapshotBalances.value.get(day.date) ?? null,
+        ),
+      ],
       borderColor: tokens.value.snapshot,
       borderWidth: 2,
       borderDash: [6, 5],
@@ -198,7 +211,7 @@ const chartData = computed<ChartData<'line'>>(() => {
   }
 
   return {
-    labels: props.days.map((d) => String(d.day)),
+    labels: ['Início', ...props.days.map((d) => String(d.day))],
     datasets,
   }
 })
@@ -250,7 +263,13 @@ const referenceLines: Plugin<'line'> = {
 
 /* ---------- tooltip em HTML ---------- */
 
-const tooltip = ref<{ day: CashFlowDay; x: number; y: number; width: number } | null>(null)
+const tooltip = ref<{
+  day: CashFlowDay | null
+  balance: number
+  x: number
+  y: number
+  width: number
+} | null>(null)
 
 /**
  * O card do Akoma tem `overflow: hidden`, então o tooltip não pode vazar para
@@ -284,12 +303,19 @@ function externalTooltip(context: { chart: Chart; tooltip: any }) {
     return
   }
   const index = model.dataPoints?.[0]?.dataIndex
-  const day = index == null ? null : props.days[index]
-  if (!day) {
+  if (index == null) {
     tooltip.value = null
     return
   }
-  tooltip.value = { day, x: model.caretX, y: model.caretY, width: context.chart.width }
+  const day = index === 0 ? null : props.days[index - 1]
+  const balance = day?.balance ?? props.openingBalance
+  tooltip.value = {
+    day,
+    balance,
+    x: model.caretX,
+    y: model.caretY,
+    width: context.chart.width,
+  }
 }
 
 const chartOptions = computed<ChartOptions<'line'>>(() => ({
@@ -301,7 +327,8 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
    */
   interaction: { mode: 'index', intersect: false },
   onClick: (_e, elements) => {
-    const day = props.days[elements[0]?.index ?? -1]
+    const index = elements[0]?.index ?? -1
+    const day = index > 0 ? props.days[index - 1] : null
     if (day) emit('select', day.date)
   },
   onHover: (event, elements) => {
@@ -357,7 +384,8 @@ function formatSignedMoney(value: number) {
   return `${value >= 0 ? '+' : ''}${formatMoney(value)}`
 }
 
-function snapshotBalance(day: CashFlowDay) {
+function snapshotBalance(day: CashFlowDay | null) {
+  if (!day) return visibleSnapshot.value?.points[0]?.balance ?? null
   return snapshotBalances.value.get(day.date) ?? null
 }
 
@@ -438,10 +466,10 @@ const hasProjectedSegment = computed(() => props.monthKind !== 'past')
         :style="tooltipStyle"
       >
         <strong>
-          Dia {{ tooltip.day.day }}
-          <span v-if="tooltip.day.isToday">· hoje</span>
+          {{ tooltip.day ? `Dia ${tooltip.day.day}` : 'Início do mês' }}
+          <span v-if="tooltip.day?.isToday">· hoje</span>
         </strong>
-        <p>Saldo: {{ formatMoney(tooltip.day.balance) }}</p>
+        <p>Saldo: {{ formatMoney(tooltip.balance) }}</p>
         <template v-if="snapshotBalance(tooltip.day) !== null">
           <p>
             Previsto no início:
@@ -451,12 +479,12 @@ const hasProjectedSegment = computed(() => props.monthKind !== 'past')
             Diferença:
             {{
               formatSignedMoney(
-                tooltip.day.balance - snapshotBalance(tooltip.day)!,
+                tooltip.balance - snapshotBalance(tooltip.day)!,
               )
             }}
           </p>
         </template>
-        <ul v-if="tooltip.day.movements.length" class="cash-flow-chart__tooltip-list">
+        <ul v-if="tooltip.day?.movements.length" class="cash-flow-chart__tooltip-list">
           <li
             v-for="movement in tooltip.day.movements.slice(0, 4)"
             :key="movement.id"
@@ -469,7 +497,9 @@ const hasProjectedSegment = computed(() => props.monthKind !== 'past')
             +{{ tooltip.day.movements.length - 4 }} lançamento(s)
           </li>
         </ul>
-        <span v-else class="cash-flow-chart__tooltip-empty">Sem lançamentos</span>
+        <span v-else class="cash-flow-chart__tooltip-empty">
+          {{ tooltip.day ? 'Sem lançamentos' : 'Antes dos lançamentos do dia 1' }}
+        </span>
       </div>
     </div>
 

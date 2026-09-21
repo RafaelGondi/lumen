@@ -10,6 +10,9 @@ const {
 
 const drawerOpen = ref(false)
 const editingAccount = ref<Account | null>(null)
+const deleteDialogOpen = ref(false)
+const pendingDeletion = ref<Account | null>(null)
+const deleting = ref(false)
 
 const totalBalance = computed(() =>
   accounts.value.reduce((sum, account) => sum + account.balance, 0),
@@ -20,11 +23,22 @@ function openDrawer(account: Account | null) {
   drawerOpen.value = true
 }
 
-async function removeAccount(account: Account) {
-  if (!window.confirm(`Excluir a conta "${account.name}"?`)) return
+function removeAccount(account: Account) {
+  pendingDeletion.value = account
+  deleteDialogOpen.value = true
+}
 
-  await $fetch(`/api/accounts/${account.id}`, { method: 'DELETE' })
-  await refresh()
+async function confirmAccountRemoval() {
+  if (!pendingDeletion.value) return
+  deleting.value = true
+  try {
+    await $fetch(`/api/accounts/${pendingDeletion.value.id}`, { method: 'DELETE' })
+    deleteDialogOpen.value = false
+    pendingDeletion.value = null
+    await refresh()
+  } finally {
+    deleting.value = false
+  }
 }
 </script>
 
@@ -105,6 +119,15 @@ async function removeAccount(account: Account) {
       v-model:open="drawerOpen"
       :account="editingAccount"
       @saved="refresh"
+    />
+    <UiConfirmDialog
+      v-model:open="deleteDialogOpen"
+      title="Excluir conta"
+      :description="`Excluir a conta ${pendingDeletion?.name ?? ''}? Esta ação não pode ser desfeita.`"
+      confirm-label="Excluir conta"
+      :busy="deleting"
+      @confirm="confirmAccountRemoval"
+      @cancel="pendingDeletion = null"
     />
   </div>
 </template>
