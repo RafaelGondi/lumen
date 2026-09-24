@@ -43,7 +43,10 @@ const emit = defineEmits<{
 const MIN_MONTH_WIDTH = 44
 
 const wrapRef = ref<HTMLElement | null>(null)
+const bodyRef = ref<HTMLElement | null>(null)
 const scrollRef = ref<HTMLElement | null>(null)
+const tooltipRef = ref<HTMLElement | null>(null)
+const tooltipHeight = ref(0)
 
 /**
  * Chart.js desenha em canvas e não resolve `var()`, então os tokens do Akoma
@@ -86,11 +89,9 @@ const projectedCount = computed(
 )
 
 const viewportWidth = ref(0)
-/** Acompanha a rolagem para o tooltip saber onde o ponto está na área visível. */
-const scrollLeft = ref(0)
 
 function syncScroll() {
-  scrollLeft.value = scrollRef.value?.scrollLeft ?? 0
+  tooltip.value = null
 }
 
 /**
@@ -294,25 +295,22 @@ const tooltip = ref<{
 const tooltipStyle = computed(() => {
   const t = tooltip.value
   if (!t) return undefined
-  /*
-   * A âncora precisa sair da posição VISÍVEL, não da posição no canvas: o
-   * canvas é bem mais largo que a viewport e quem corta é o container que
-   * rola. Medindo contra a largura do canvas, o primeiro ponto à vista dava
-   * "meio do gráfico" e era centralizado — metade do tooltip caía fora.
-   */
-  const visivelX = t.x - scrollLeft.value
   const largura = viewportWidth.value || t.width || 1
-  const razao = visivelX / largura
+  const razao = t.x / largura
   /*
    * Nos extremos o tooltip encosta no ponto, sem a folga de 1rem: no último
    * mês essa folga jogava a borda 6px para fora do container.
    */
   const alinhamento = razao > 0.7 ? '-100%' : razao < 0.3 ? '0' : '-50%'
-  const abaixo = t.y < 120
+  const bodyHeight = bodyRef.value?.clientHeight ?? 240
+  const height = tooltipHeight.value
+  const top = height
+    ? Math.max(0, Math.min(t.y - height / 2, bodyHeight - height))
+    : t.y
   return {
     left: `${t.x}px`,
-    top: `${t.y}px`,
-    transform: `translate(${alinhamento}, ${abaixo ? '0.75rem' : 'calc(-100% - 0.75rem)'})`,
+    top: `${top}px`,
+    transform: `translateX(${alinhamento})`,
   }
 })
 
@@ -328,7 +326,20 @@ function externalTooltip(context: { chart: Chart; tooltip: any }) {
     tooltip.value = null
     return
   }
-  tooltip.value = { item, x: model.caretX, y: model.caretY, width: context.chart.width }
+  const body = bodyRef.value
+  const canvas = context.chart.canvas
+  if (!body || !canvas) return
+  const bodyRect = body.getBoundingClientRect()
+  const canvasRect = canvas.getBoundingClientRect()
+  tooltip.value = {
+    item,
+    x: canvasRect.left + model.caretX - bodyRect.left,
+    y: canvasRect.top + model.caretY - bodyRect.top,
+    width: body.clientWidth,
+  }
+  nextTick(() => {
+    tooltipHeight.value = tooltipRef.value?.offsetHeight ?? 0
+  })
 }
 
 const chartOptions = computed<ChartOptions<'line'>>(() => ({
@@ -415,7 +426,7 @@ function formatMonthKey(month: string) {
       </strong>
     </div>
 
-    <div class="projection-curve__body">
+    <div ref="bodyRef" class="projection-curve__body">
       <div class="projection-curve__axis" aria-hidden="true">
         <span
           v-for="tick in axisTicks"
@@ -446,27 +457,45 @@ function formatMonthKey(month: string) {
             </template>
           </ClientOnly>
 
-          <div
-            v-if="tooltip"
-            class="projection-curve__tooltip"
-            :style="tooltipStyle"
-          >
-            <p>
-              {{ formatMonthKey(tooltip.item.month) }}
-              <span v-if="isSettled(tooltip.item)">· quitada</span>
-              <span v-else-if="tooltip.item.past">· fechada</span>
-            </p>
-            <div>
-              {{ formatMoney(tooltip.item.amount) }}
-              <em v-if="tooltip.item.residual">residual</em>
-            </div>
-            <!-- Só quando há divisão: repetir "pago 0" em todo mês futuro é ruído. -->
-            <ul v-if="isPartlyPaid(tooltip.item)" class="projection-curve__split">
-              <li>Pago {{ formatMoney(tooltip.item.paidAmount ?? 0) }}</li>
-              <li>Em aberto {{ formatMoney(openAmountOf(tooltip.item)) }}</li>
-            </ul>
-          </div>
         </div>
+      </div>
+
+      <div
+        v-if="tooltip"
+        ref="tooltipRef"
+        class="projection-curve__tooltip"
+        :style="tooltipStyle"
+      >
+        <p>
+          {{ formatMonthKey(tooltip.item.month) }}
+          <span v-if="isSettled(tooltip.item)">· quitada</span>
+          <span v-else-if="tooltip.item.past">· fechada</span>
+        </p>
+        <div>
+          {{ formatMoney(tooltip.item.amount) }}
+          <em v-if="tooltip.item.residual">residual</em>
+        </div>
+        <ul
+          v-if="tooltip.item.cards?.length"
+          class="projection-curve__cards"
+        >
+          <li
+            v-for="card in tooltip.item.cards"
+            :key="card.cardId"
+          >
+            <span
+              class="projection-curve__card-dot"
+              :style="{ backgroundColor: card.color }"
+            />
+            <span>{{ card.cardName }}</span>
+            <strong>{{ formatMoney(card.amount) }}</strong>
+          </li>
+        </ul>
+        <!-- Só quando há divisão: repetir "pago 0" em todo mês futuro é ruído. -->
+        <ul v-if="isPartlyPaid(tooltip.item)" class="projection-curve__split">
+          <li>Pago {{ formatMoney(tooltip.item.paidAmount ?? 0) }}</li>
+          <li>Em aberto {{ formatMoney(openAmountOf(tooltip.item)) }}</li>
+        </ul>
       </div>
     </div>
 
@@ -509,6 +538,7 @@ function formatMonthKey(month: string) {
 
 .projection-curve__body {
   display: grid;
+  position: relative;
   margin-top: var(--space-5);
   grid-template-columns: 3.75rem minmax(0, 1fr);
   gap: var(--space-2);
@@ -580,6 +610,38 @@ function formatMonthKey(month: string) {
   font-size: var(--text-2xs);
   font-variant-numeric: tabular-nums;
   list-style: none;
+}
+
+.projection-curve__cards {
+  display: grid;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid rgb(255 255 255 / 18%);
+  gap: var(--space-1);
+  list-style: none;
+}
+
+.projection-curve__cards li {
+  display: grid;
+  grid-template-columns: 0.5rem minmax(6rem, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  color: rgb(255 255 255 / 76%);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.projection-curve__cards strong {
+  color: var(--toast-fg);
+  font-weight: var(--weight-semibold);
+  text-align: right;
+}
+
+.projection-curve__card-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: var(--radius-round);
 }
 
 .projection-curve__tooltip em {

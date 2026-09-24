@@ -187,7 +187,7 @@ async function confirmCardRemoval() {
       <CardsConsolidatedProjectionChart
         v-else-if="projection"
         title="Projeção consolidada de faturas"
-        subtitle="Próximos 12 meses • todos os cartões • trecho tracejado = faturas já quitadas"
+        subtitle="Próximos 12 meses • passe sobre um mês para ver a composição por cartão"
         :items="projection.months"
         :total="projection.total"
       />

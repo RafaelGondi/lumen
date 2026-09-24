@@ -358,6 +358,7 @@ export function buildConsolidatedCardsProjection(
     const month = shiftMonth(fromMonth, offset)
     let amount = 0
     let paid = 0
+    const cards: NonNullable<CardInvoiceProjectionMonth['cards']> = []
     /*
      * Um mês pode ficar parcialmente pago: são vários cartões, cada um com sua
      * data de fechamento e pagamento. Por isso o pago é somado por cartão, e
@@ -368,25 +369,51 @@ export function buildConsolidatedCardsProjection(
       if (paidTotal !== undefined) {
         amount += paidTotal
         paid += paidTotal
+        if (paidTotal > 0) {
+          cards.push({
+            cardId: card.id,
+            cardName: card.name,
+            color: card.color,
+            amount: roundMoney(paidTotal),
+            paidAmount: roundMoney(paidTotal),
+          })
+        }
         continue
       }
       const entriesSubtotal = invoiceEntries(db, card, month).reduce(
         (entrySum, entry) => entrySum + entry.amount,
         0,
       )
-      amount += Math.max(
+      const cardAmount = roundMoney(Math.max(
         0,
         entriesSubtotal +
           (adjustments.get(`${card.id}:${month}`) ?? 0) -
           (rewards.get(`${card.id}:${month}`) ?? 0) -
           (credits.get(`${card.id}:${month}`) ?? 0),
-      )
+      ))
+      amount += cardAmount
+      if (cardAmount > 0) {
+        cards.push({
+          cardId: card.id,
+          cardName: card.name,
+          color: card.color,
+          amount: cardAmount,
+          paidAmount: 0,
+        })
+      }
     }
     return {
       month,
       shortLabel: MONTH_SHORT[monthParts(month).month - 1]!,
       amount: roundMoney(amount),
       paidAmount: roundMoney(paid),
+      cards: cards.sort(
+        (a, b) =>
+          b.amount - a.amount ||
+          a.cardName.localeCompare(b.cardName, 'pt-BR', {
+            sensitivity: 'base',
+          }),
+      ),
     }
   }
 

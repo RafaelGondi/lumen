@@ -71,6 +71,21 @@ export interface CardInvoiceProjectionMonth {
    * na sua própria data.
    */
   paidAmount?: number
+  /**
+   * Composição do total consolidado por cartão. Só é preenchida na projeção
+   * da página de cartões; a projeção de uma fatura individual não precisa
+   * repetir o próprio cartão.
+   */
+  cards?: CardInvoiceProjectionCard[]
+}
+
+export interface CardInvoiceProjectionCard {
+  cardId: number
+  cardName: string
+  color: string
+  amount: number
+  /** Parte do valor deste cartão que já foi quitada. */
+  paidAmount: number
 }
 
 export interface CardsProjectionSummary {
