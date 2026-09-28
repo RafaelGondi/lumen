@@ -224,6 +224,12 @@ export function buildAssetStatement(assetId: number): AssetStatement {
   return { asset: assetFromSimulation(row, simulation, 12), asOf, entries: simulation.entries.slice().reverse() }
 }
 
+export function assetBalanceAtDate(assetId: number, targetDate: string): number | null {
+  const row = assetRows(assetId)[0]
+  if (!row || targetDate < row.balanceDate) return null
+  return simulateAsset(row, movementRows(assetId), targetDate).balance
+}
+
 export function buildAssetProjection(months: number, assetId?: number): AssetProjectionReport {
   const asOf = todayLocal()
   const rows = assetRows(assetId)

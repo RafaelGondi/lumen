@@ -349,6 +349,27 @@ function monthKindFor(monthKey: string, today: string): CashFlowMonthKind {
   return 'current'
 }
 
+export function getProjectedMonthlyExpenses(
+  db: Database.Database,
+  startMonth: string,
+  monthCount: number,
+) {
+  const months = Array.from({ length: monthCount }, (_, index) =>
+    addMonthsLocal(`${startMonth}-01`, index).slice(0, 7),
+  )
+  if (!months.length) return []
+  const lastMonth = months.at(-1)!
+  const { end } = monthBounds(lastMonth)
+  const movements = collectProjectedMovements(db, loadActiveCards(db), todayLocal(), end)
+  const totals = new Map<string, number>()
+  for (const movement of movements) {
+    if (movement.signedAmount >= 0) continue
+    const month = movement.date.slice(0, 7)
+    totals.set(month, roundMoney((totals.get(month) ?? 0) + Math.abs(movement.signedAmount)))
+  }
+  return months.map(month => ({ month, amount: roundMoney(totals.get(month) ?? 0) }))
+}
+
 function parseCashFlowSnapshot(
   row: CashFlowSnapshotRow | undefined,
 ): CashFlowSnapshot | null {

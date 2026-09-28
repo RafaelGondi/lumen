@@ -471,6 +471,45 @@ function migrate(database: Database.Database) {
   migrateCategorizationRules(database)
   migrateDebtTracking(database)
   migrateAssets(database)
+  migrateFinancialSecurity(database)
+}
+
+function migrateFinancialSecurity(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS financial_security_assets (
+      asset_id INTEGER PRIMARY KEY REFERENCES assets(id) ON DELETE CASCADE,
+      enabled INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS financial_security_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      monthly_cost_override REAL CHECK (monthly_cost_override > 0),
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS financial_security_income_sources (
+      entry_id INTEGER PRIMARY KEY REFERENCES entries(id) ON DELETE CASCADE,
+      enabled INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS financial_security_accounts (
+      account_id INTEGER PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+      enabled INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `)
+  if (!hasColumn(database, 'financial_security_settings', 'cost_mode')) {
+    database.exec(
+      `ALTER TABLE financial_security_settings
+       ADD COLUMN cost_mode TEXT NOT NULL DEFAULT 'historical'
+       CHECK (cost_mode IN ('historical', 'projected'))`,
+    )
+  }
 }
 
 function migrateAssets(database: Database.Database) {
