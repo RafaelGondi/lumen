@@ -242,7 +242,7 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1120px) {
   .topbar__inner {
     width: min(calc(100% - var(--space-6)), var(--content-max));
     align-items: center;

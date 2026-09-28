@@ -179,5 +179,7 @@ function formatCoverage(value: number) {
 
 <style scoped>
 .financial-security-chart { height: 23rem; padding: var(--space-4) var(--space-5) var(--space-2); }
-@media (max-width: 720px) { .financial-security-chart { height: 20rem; padding-inline: var(--space-2); } }
+@media (max-width: 720px) {
+  .financial-security-chart { height: 19rem; padding: var(--space-3) var(--space-2) var(--space-1); }
+}
 </style>

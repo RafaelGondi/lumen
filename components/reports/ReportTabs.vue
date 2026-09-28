@@ -58,4 +58,28 @@ const tabs = [
   box-shadow: var(--shadow-xs);
   font-weight: var(--weight-semibold);
 }
+
+@media (max-width: 720px) {
+  .report-tabs {
+    display: flex;
+    width: calc(100% + var(--space-3));
+    padding-right: var(--space-3);
+    flex-wrap: nowrap;
+    gap: var(--space-2);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+  }
+
+  .report-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .report-tabs__item {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    white-space: nowrap;
+  }
+}
 </style>

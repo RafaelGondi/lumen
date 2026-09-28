@@ -548,7 +548,7 @@ defineExpose({ openSearch, closeSearch })
   }
 }
 
-@media (min-width: 901px) {
+@media (min-width: 1121px) {
   .global-search__trigger {
     display: inline-flex;
   }
