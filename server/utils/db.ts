@@ -451,7 +451,24 @@ function migrate(database: Database.Database) {
       ON entry_occurrence_exceptions (entry_id, occurrence_month);
   `)
 
+  if (
+    !hasColumn(
+      database,
+      'entry_occurrence_exceptions',
+      'exclude_from_totals',
+    )
+  ) {
+    database.exec(
+      'ALTER TABLE entry_occurrence_exceptions ADD COLUMN exclude_from_totals INTEGER',
+    )
+  }
+
   migrateEntriesForCards(database)
+  if (!hasColumn(database, 'entries', 'exclude_from_totals')) {
+    database.exec(
+      'ALTER TABLE entries ADD COLUMN exclude_from_totals INTEGER NOT NULL DEFAULT 0',
+    )
+  }
   database.exec(
     'CREATE INDEX IF NOT EXISTS idx_entries_card_date ON entries (card_id, date)',
   )

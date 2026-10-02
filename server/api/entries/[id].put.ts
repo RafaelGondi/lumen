@@ -75,7 +75,8 @@ export default defineEventHandler(async (event) => {
          payment_state AS paymentState,
          payment_date AS paymentDate,
          month_end AS useMonthEnd,
-         track_as_debt AS trackAsDebt
+         track_as_debt AS trackAsDebt,
+         exclude_from_totals AS excludeFromTotals
        FROM entries
        WHERE id = ?`,
     )
@@ -100,6 +101,7 @@ export default defineEventHandler(async (event) => {
         paymentDate: string | null
         useMonthEnd: number
         trackAsDebt: number
+        excludeFromTotals: number
       }
     | undefined
 
@@ -155,6 +157,12 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'Marcação de dívida inválida.',
     })
   }
+  if (typeof body.excludeFromTotals !== 'boolean') {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Marcação de cálculo inválida.',
+    })
+  }
 
   const values = {
     description: body.description.trim(),
@@ -163,6 +171,7 @@ export default defineEventHandler(async (event) => {
     statementName: body.statementName?.trim() || null,
     notes: body.notes?.trim() || null,
     date: body.date,
+    excludeFromTotals: body.excludeFromTotals ? 1 : 0,
   }
 
   const updateParent = db.prepare(
@@ -174,12 +183,20 @@ export default defineEventHandler(async (event) => {
          notes = @notes,
          date = @date,
          end_date = @endDate,
-         installment_count = @installmentCount
+         installment_count = @installmentCount,
+         exclude_from_totals = @excludeFromTotals
      WHERE id = @id`,
   )
 
   const edit = db.transaction(() => {
-    const shouldTrackAsDebt = parent.type === 'expense' && body.trackAsDebt
+    const editsWholeSeries =
+      parent.recurrence === 'single' ||
+      body.scope === 'series' ||
+      occurrence.occurrenceIndex === 1
+    const shouldTrackAsDebt =
+      parent.type === 'expense' &&
+      body.trackAsDebt &&
+      !(editsWholeSeries && body.excludeFromTotals)
     db.prepare('UPDATE entries SET track_as_debt = ? WHERE id = ?').run(
       shouldTrackAsDebt ? 1 : 0,
       id,
@@ -192,6 +209,12 @@ export default defineEventHandler(async (event) => {
          enabled = excluded.enabled,
          updated_at = excluded.updated_at`,
     ).run(id, shouldTrackAsDebt ? 1 : 0, now, now)
+
+    if (editsWholeSeries) {
+      db.prepare(
+        'UPDATE entries SET exclude_from_totals = ? WHERE id = ?',
+      ).run(body.excludeFromTotals ? 1 : 0, id)
+    }
 
     if (parent.recurrence === 'single') {
       updateParent.run({
@@ -216,7 +239,8 @@ export default defineEventHandler(async (event) => {
         values.categoryId === occurrence.categoryId &&
         values.statementName === occurrence.statementName &&
         values.notes === occurrence.notes &&
-        values.date === occurrence.dueDate
+        values.date === occurrence.dueDate &&
+        body.excludeFromTotals === occurrence.excludeFromTotals
       const endsBeforeEditedOccurrence =
         requestedEndDate !== null &&
         requestedEndDate.slice(0, 7) < body.occurrenceMonth
@@ -227,8 +251,9 @@ export default defineEventHandler(async (event) => {
       db.prepare(
         `INSERT INTO entry_occurrence_exceptions (
            entry_id, occurrence_month, action, due_date, amount,
-           description, category_id, statement_name, notes, created_at
-         ) VALUES (?, ?, 'edit', ?, ?, ?, ?, ?, ?, ?)
+           description, category_id, statement_name, notes,
+           exclude_from_totals, created_at
+         ) VALUES (?, ?, 'edit', ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(entry_id, occurrence_month) DO UPDATE SET
            action = 'edit',
            due_date = excluded.due_date,
@@ -236,7 +261,8 @@ export default defineEventHandler(async (event) => {
            description = excluded.description,
            category_id = excluded.category_id,
            statement_name = excluded.statement_name,
-           notes = excluded.notes`,
+           notes = excluded.notes,
+           exclude_from_totals = excluded.exclude_from_totals`,
       ).run(
         id,
         body.occurrenceMonth,
@@ -246,6 +272,7 @@ export default defineEventHandler(async (event) => {
         values.categoryId,
         values.statementName,
         values.notes,
+        body.excludeFromTotals ? 1 : 0,
         todayLocal(),
       )
       return
@@ -369,9 +396,10 @@ export default defineEventHandler(async (event) => {
          type, account_id, category_id, description, amount,
          statement_name, notes, recurrence, date, end_date,
          installment_count, installment_index, group_id, status, created_at,
-         payment_state, payment_date, month_end, track_as_debt
+         payment_state, payment_date, month_end, track_as_debt,
+         exclude_from_totals
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'pending', ?,
-                 'auto', NULL, ?, ?)`,
+                 'auto', NULL, ?, ?, ?)`,
     ).run(
       parent.type,
       parent.accountId,
@@ -387,7 +415,10 @@ export default defineEventHandler(async (event) => {
       randomUUID(),
       todayLocal(),
       parent.useMonthEnd,
-      parent.type === 'expense' && body.trackAsDebt ? 1 : 0,
+      parent.type === 'expense' && body.trackAsDebt && !body.excludeFromTotals
+        ? 1
+        : 0,
+      body.excludeFromTotals ? 1 : 0,
     )
     const newId = Number(result.lastInsertRowid)
     const oldStartIndex = monthIndex(body.occurrenceMonth)
@@ -413,7 +444,8 @@ export default defineEventHandler(async (event) => {
         `SELECT occurrence_month AS occurrenceMonth, action,
                 due_date AS dueDate, amount, description,
                 category_id AS categoryId, statement_name AS statementName,
-                notes, created_at AS createdAt
+                notes, exclude_from_totals AS excludeFromTotals,
+                created_at AS createdAt
          FROM entry_occurrence_exceptions
          WHERE entry_id = ? AND occurrence_month > ?`,
       )
@@ -426,6 +458,7 @@ export default defineEventHandler(async (event) => {
       categoryId: number | null
       statementName: string | null
       notes: string | null
+      excludeFromTotals: number | null
       createdAt: string
     }[]
 
@@ -456,8 +489,9 @@ export default defineEventHandler(async (event) => {
     const insertException = db.prepare(
       `INSERT INTO entry_occurrence_exceptions (
          entry_id, occurrence_month, action, due_date, amount,
-         description, category_id, statement_name, notes, created_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         description, category_id, statement_name, notes,
+         exclude_from_totals, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     for (const exception of exceptions) {
       const offset = monthIndex(exception.occurrenceMonth) - oldStartIndex
@@ -471,6 +505,7 @@ export default defineEventHandler(async (event) => {
         exception.categoryId,
         exception.statementName,
         exception.notes,
+        exception.excludeFromTotals,
         exception.createdAt,
       )
     }

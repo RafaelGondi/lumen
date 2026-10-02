@@ -59,6 +59,7 @@ const endDateText = ref('')
 const installmentCount = ref(2)
 const useMonthEnd = ref(false)
 const trackAsDebt = ref(false)
+const excludeFromTotals = ref(false)
 const editScope = ref<EntrySeriesScope>('occurrence')
 const destinationAccountId = ref<number | null>(null)
 const destinationAccounts = ref<Account[]>([])
@@ -265,6 +266,7 @@ function resetForm() {
     installmentCount.value = current.installmentCount ?? 2
     useMonthEnd.value = current.useMonthEnd
     trackAsDebt.value = current.trackAsDebt
+    excludeFromTotals.value = current.excludeFromTotals
     destinationAccountId.value = current.destinationAccountId
     editScope.value = 'occurrence'
     return
@@ -282,6 +284,7 @@ function resetForm() {
   installmentCount.value = 2
   useMonthEnd.value = false
   trackAsDebt.value = false
+  excludeFromTotals.value = false
   destinationAccountId.value = null
   editScope.value = 'occurrence'
 }
@@ -309,6 +312,7 @@ function setEntryType(type: 'income' | 'expense' | 'transfer') {
     destinationAccountId.value = null
   }
   if (type !== 'expense') trackAsDebt.value = false
+  if (type === 'transfer') excludeFromTotals.value = false
 }
 
 async function loadDestinationAccounts() {
@@ -387,7 +391,10 @@ async function save() {
           statementName: statementName.value.trim() || null,
           notes: notes.value.trim() || null,
           date: useMonthEnd.value ? monthEndLocal(date) : date,
-          trackAsDebt: isExpense.value && trackAsDebt.value,
+          trackAsDebt:
+            isExpense.value && trackAsDebt.value && !excludeFromTotals.value,
+          excludeFromTotals:
+            !isTransfer.value && excludeFromTotals.value,
           ...(props.entry.recurrence === 'fixed' &&
           endDate !== props.entry.endDate
             ? { endDate }
@@ -449,7 +456,10 @@ async function save() {
           !isTransfer.value &&
           recurrence.value === 'fixed' &&
           useMonthEnd.value,
-        trackAsDebt: isExpense.value && trackAsDebt.value,
+        trackAsDebt:
+          isExpense.value && trackAsDebt.value && !excludeFromTotals.value,
+        excludeFromTotals:
+          !isTransfer.value && excludeFromTotals.value,
       }
 
       await $fetch('/api/entries', { method: 'POST', body: payload })
@@ -827,7 +837,18 @@ async function save() {
         </p>
       </template>
 
-      <label v-if="isExpense" class="entry-form__debt-toggle">
+      <label v-if="!isTransfer" class="entry-form__calculation-toggle">
+        <input v-model="excludeFromTotals" type="checkbox" />
+        <span>
+          <strong>Não considerar nos cálculos</strong>
+          <small>
+            Mantém o lançamento no histórico, sem alterar saldos, orçamento,
+            projeções ou relatórios.
+          </small>
+        </span>
+      </label>
+
+      <label v-if="isExpense && !excludeFromTotals" class="entry-form__debt-toggle">
         <input v-model="trackAsDebt" type="checkbox" />
         <span>
           <strong>Acompanhar como dívida</strong>
@@ -1193,7 +1214,8 @@ async function save() {
 }
 
 .entry-form__month-end,
-.entry-form__debt-toggle {
+.entry-form__debt-toggle,
+.entry-form__calculation-toggle {
   display: flex;
   padding: var(--space-3) var(--space-4);
   align-items: flex-start;
@@ -1206,26 +1228,30 @@ async function save() {
 }
 
 .entry-form__month-end input,
-.entry-form__debt-toggle input {
+.entry-form__debt-toggle input,
+.entry-form__calculation-toggle input {
   margin-top: 0.15rem;
   accent-color: var(--color-positive);
 }
 
 .entry-form__month-end span,
-.entry-form__debt-toggle span {
+.entry-form__debt-toggle span,
+.entry-form__calculation-toggle span {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
 }
 
 .entry-form__month-end strong,
-.entry-form__debt-toggle strong {
+.entry-form__debt-toggle strong,
+.entry-form__calculation-toggle strong {
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
 }
 
 .entry-form__month-end small,
-.entry-form__debt-toggle small {
+.entry-form__debt-toggle small,
+.entry-form__calculation-toggle small {
   color: var(--color-ink-muted);
   font-size: 0.6875rem;
 }

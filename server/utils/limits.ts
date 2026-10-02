@@ -428,6 +428,7 @@ function oneTimeConsumptionItems(
        LEFT JOIN accounts ON accounts.id = e.account_id
        LEFT JOIN cards ON cards.id = e.card_id
        WHERE e.type = 'expense'
+         AND (e.card_id IS NOT NULL OR e.exclude_from_totals = 0)
          AND e.recurrence IN ('single', 'installment')
          AND substr(e.date, 1, 7) = ?
          AND (

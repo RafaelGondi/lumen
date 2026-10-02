@@ -26,6 +26,7 @@ type ParentEntry = {
   paymentDate: string | null
   useMonthEnd: boolean
   trackAsDebt: boolean
+  excludeFromTotals: boolean
 }
 
 type OccurrencePayment = {
@@ -45,6 +46,7 @@ type OccurrenceException = {
   categoryId: number | null
   statementName: string | null
   notes: string | null
+  excludeFromTotals: number | null
 }
 
 type CategoryMeta = {
@@ -105,7 +107,8 @@ function loadParents(
        e.payment_state AS paymentState,
        e.payment_date AS paymentDate,
        e.month_end AS useMonthEnd,
-       e.track_as_debt AS trackAsDebt
+       e.track_as_debt AS trackAsDebt,
+       e.exclude_from_totals AS excludeFromTotals
      FROM entries e
      JOIN accounts a ON a.id = e.account_id
      LEFT JOIN accounts d ON d.id = e.destination_account_id
@@ -149,7 +152,8 @@ function loadExceptions(db: Database.Database) {
          description,
          category_id AS categoryId,
          statement_name AS statementName,
-         notes
+         notes,
+         exclude_from_totals AS excludeFromTotals
        FROM entry_occurrence_exceptions`,
     )
     .all() as OccurrenceException[]
@@ -303,6 +307,10 @@ function deriveOccurrence(
     isException: exception?.action === 'edit',
     useMonthEnd: Boolean(parent.useMonthEnd),
     trackAsDebt: Boolean(parent.trackAsDebt),
+    excludeFromTotals:
+      exception?.action === 'edit' && exception.excludeFromTotals !== null
+        ? Boolean(exception.excludeFromTotals)
+        : Boolean(parent.excludeFromTotals),
     transferDirection,
   }
 }
@@ -353,6 +361,7 @@ export function occurrencesForCashMonth(
   db: Database.Database,
   cashMonth: string,
   accountId?: number,
+  options: { includeExcluded?: boolean } = {},
 ): EntryOccurrence[] {
   const today = todayLocal()
   const parents = loadParents(db, accountId)
@@ -379,15 +388,16 @@ export function occurrencesForCashMonth(
     }
   }
 
-  return [...result.values()].sort(
-    (a, b) => b.date.localeCompare(a.date) || b.id - a.id,
-  )
+  return [...result.values()]
+    .filter((item) => options.includeExcluded || !item.excludeFromTotals)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
 }
 
 export function occurrencesForCompetenceMonth(
   db: Database.Database,
   competenceMonth: string,
   accountId?: number,
+  options: { includeExcluded?: boolean } = {},
 ): EntryOccurrence[] {
   const today = todayLocal()
   const parents = loadParents(db, accountId)
@@ -421,9 +431,9 @@ export function occurrencesForCompetenceMonth(
     }
   }
 
-  return [...result.values()].sort(
-    (a, b) => b.date.localeCompare(a.date) || b.id - a.id,
-  )
+  return [...result.values()]
+    .filter((item) => options.includeExcluded || !item.excludeFromTotals)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
 }
 
 function occurrenceMonthsThrough(
@@ -455,6 +465,7 @@ export function settledOccurrencesUntil(
   db: Database.Database,
   cutoff: string,
   accountId?: number,
+  options: { includeExcluded?: boolean } = {},
 ): EntryOccurrence[] {
   const parents = loadParents(db, accountId)
   const payments = loadPayments(db)
@@ -503,7 +514,9 @@ export function settledOccurrencesUntil(
     }
   }
 
-  return result
+  return result.filter(
+    (item) => options.includeExcluded || !item.excludeFromTotals,
+  )
 }
 
 export function occurrenceByKey(
@@ -536,7 +549,8 @@ export function occurrenceByKey(
          e.payment_state AS paymentState,
          e.payment_date AS paymentDate,
          e.month_end AS useMonthEnd,
-         e.track_as_debt AS trackAsDebt
+         e.track_as_debt AS trackAsDebt,
+         e.exclude_from_totals AS excludeFromTotals
        FROM entries e
        JOIN accounts a ON a.id = e.account_id
        LEFT JOIN accounts d ON d.id = e.destination_account_id
@@ -583,7 +597,7 @@ export function accountBalanceAtCutoff(
       }
       return sum
     },
-    0,
+      0,
   )
   return roundMoney(account.initialBalance + movement)
 }

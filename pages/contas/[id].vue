@@ -126,6 +126,7 @@ const monthSummary = computed(() => {
   let expense = 0
 
   for (const entry of monthEntries.value) {
+    if (entry.excludeFromTotals) continue
     if (entry.type === 'income') income += entry.amount
     else if (entry.type === 'expense') expense += entry.amount
   }
@@ -304,6 +305,7 @@ function isSettled(entry: EntryOccurrence) {
 }
 
 function statusLabel(entry: EntryOccurrence) {
+  if (entry.excludeFromTotals) return 'Fora dos cálculos'
   if (entry.type === 'transfer') {
     if (entry.paymentState === 'unpaid') return 'Não liquidada'
     if (entry.settled) return 'Liquidada'
@@ -503,7 +505,10 @@ function entryMeta(entry: EntryOccurrence) {
             v-for="entry in filteredEntries"
             :key="entry.occurrenceKey"
             class="entry-row"
-            :class="{ 'entry-row--settled': isSettled(entry) }"
+            :class="{
+              'entry-row--settled': isSettled(entry),
+              'entry-row--excluded': entry.excludeFromTotals,
+            }"
             interactive
           >
             <div class="entry-row__icon" aria-hidden="true">
@@ -533,11 +538,12 @@ function entryMeta(entry: EntryOccurrence) {
               :class="{
                 'entry-row__status--pending': !entry.settled,
                 'entry-row__status--unpaid': entry.paymentState === 'unpaid',
+                'entry-row__status--excluded': entry.excludeFromTotals,
               }"
             >
               <template v-if="statusLabel(entry)">
                 <span>{{ statusLabel(entry) }}</span>
-                <CheckCircle2 aria-hidden="true" />
+                <CheckCircle2 v-if="!entry.excludeFromTotals" aria-hidden="true" />
               </template>
             </div>
 
@@ -546,6 +552,7 @@ function entryMeta(entry: EntryOccurrence) {
               :class="{
                 'entry-row__amount--expense': isOutgoing(entry),
                 'entry-row__amount--transfer': entry.type === 'transfer',
+                'entry-row__amount--excluded': entry.excludeFromTotals,
               }"
             >
               {{ isOutgoing(entry) ? '−' : '+' }}
@@ -1045,6 +1052,10 @@ function entryMeta(entry: EntryOccurrence) {
   color: var(--color-negative-ink);
 }
 
+.entry-row__status--excluded {
+  color: var(--color-ink-muted);
+}
+
 .entry-row__amount {
   display: flex;
   align-items: baseline;
@@ -1058,6 +1069,12 @@ function entryMeta(entry: EntryOccurrence) {
 
 .entry-row__amount--expense {
   color: var(--color-negative-ink);
+}
+
+.entry-row__amount--excluded {
+  color: var(--color-ink-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
 }
 
 .entry-row__actions {

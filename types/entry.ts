@@ -28,6 +28,7 @@ export interface Entry {
   status: EntryStatus
   useMonthEnd: boolean
   trackAsDebt: boolean
+  excludeFromTotals: boolean
 }
 
 export interface EntryOccurrence extends Entry {
@@ -62,6 +63,7 @@ export interface EntryPayload {
   installmentCount: number | null
   useMonthEnd: boolean
   trackAsDebt: boolean
+  excludeFromTotals: boolean
 }
 
 export interface EntryPaymentPayload {
@@ -80,6 +82,7 @@ export interface EntryOccurrenceEditPayload {
   notes: string | null
   date: string
   trackAsDebt: boolean
+  excludeFromTotals: boolean
   /** Novo término da série fixa. Null mantém a recorrência sem data final. */
   endDate?: string | null
 }

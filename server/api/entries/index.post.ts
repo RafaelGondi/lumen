@@ -83,12 +83,13 @@ export default defineEventHandler(async (event) => {
          type, account_id, destination_account_id, category_id, description,
          amount, statement_name, notes, recurrence, date, end_date,
          installment_count, installment_index, group_id, status, created_at,
-         payment_state, payment_date, month_end, track_as_debt
+         payment_state, payment_date, month_end, track_as_debt,
+         exclude_from_totals
        ) VALUES (
          @type, @accountId, @destinationAccountId, @categoryId, @description,
          @amount, @statementName, @notes, @recurrence, @date, @endDate,
          @installmentCount, NULL, @groupId, @status, @createdAt,
-         'auto', NULL, @monthEnd, @trackAsDebt
+         'auto', NULL, @monthEnd, @trackAsDebt, @excludeFromTotals
        )`,
     )
     .run({
@@ -112,6 +113,7 @@ export default defineEventHandler(async (event) => {
       createdAt,
       monthEnd: payload.useMonthEnd ? 1 : 0,
       trackAsDebt: payload.trackAsDebt ? 1 : 0,
+      excludeFromTotals: payload.excludeFromTotals ? 1 : 0,
     })
 
   const id = Number(result.lastInsertRowid)

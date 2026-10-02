@@ -24,5 +24,7 @@ export default defineEventHandler((event): EntryOccurrence[] => {
   }
 
   const db = useDb()
-  return occurrencesForCashMonth(db, month, accountId)
+  return occurrencesForCashMonth(db, month, accountId, {
+    includeExcluded: true,
+  })
 })

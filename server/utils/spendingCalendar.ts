@@ -347,6 +347,7 @@ function accountItemsForMonth(
          WHERE account_id IS NOT NULL
            AND card_id IS NULL
            AND type = 'expense'
+           AND exclude_from_totals = 0
            AND recurrence IN ('single', 'installment')
            AND substr(date, 1, 7) = ?`,
       )

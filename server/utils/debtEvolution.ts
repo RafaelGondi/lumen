@@ -65,6 +65,7 @@ export function loadDebtSourceOptions(db: Database.Database): DebtSourceOption[]
      WHERE e.type = 'expense'
        AND e.card_id IS NULL
        AND e.track_as_debt = 1
+       AND e.exclude_from_totals = 0
      ORDER BY e.date DESC, e.id DESC`,
   ).all() as EntryCandidateRow[]
 
