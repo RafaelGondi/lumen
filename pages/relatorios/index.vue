@@ -409,19 +409,6 @@ function movementMeta(movement: CashFlowMovement) {
             </p>
           </div>
 
-          <div
-            v-if="selectedDaySummary?.pendingImpact"
-            class="reports-day__pending"
-          >
-            <span>Previsto, ainda não refletido no saldo</span>
-            <strong
-              :class="selectedDaySummary.pendingImpact >= 0 ? 'is-positive' : 'is-negative'"
-            >
-              {{ selectedDaySummary.pendingImpact >= 0 ? '+' : '−' }}
-              <UiMoney :value="Math.abs(selectedDaySummary.pendingImpact)" />
-            </strong>
-          </div>
-
           <UiEmptyState
             v-if="!criticalPeriods.length"
             title="Nenhum período de atenção neste mês"
@@ -488,6 +475,28 @@ function movementMeta(movement: CashFlowMovement) {
               <span>Saldo final</span>
               <strong><UiMoney :value="selectedDaySummary.closingBalance" /></strong>
             </div>
+          </div>
+
+          <div
+            v-if="selectedDaySummary?.pendingImpact"
+            class="reports-day__pending"
+          >
+            <div>
+              <span class="reports-day__pending-title">
+                {{
+                  selectedDaySummary.pendingImpact < 0
+                    ? 'Saídas previstas ainda não descontadas'
+                    : 'Entradas previstas ainda não adicionadas'
+                }}
+              </span>
+              <small>Já consideradas na projeção dos próximos dias.</small>
+            </div>
+            <strong
+              :class="selectedDaySummary.pendingImpact >= 0 ? 'is-positive' : 'is-negative'"
+            >
+              {{ selectedDaySummary.pendingImpact >= 0 ? '+' : '−' }}
+              <UiMoney :value="Math.abs(selectedDaySummary.pendingImpact)" />
+            </strong>
           </div>
 
           <UiEmptyState
@@ -920,12 +929,27 @@ function movementMeta(movement: CashFlowMovement) {
 
 .reports-day__pending {
   display: flex;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-warning-soft);
+  background: var(--color-brand-soft);
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.reports-day__pending > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.reports-day__pending-title {
+  color: var(--color-brand-ink);
+  font-weight: var(--weight-semibold);
+}
+
+.reports-day__pending small {
   color: var(--color-ink-muted);
   font-size: var(--text-xs);
 }
@@ -1080,6 +1104,11 @@ function movementMeta(movement: CashFlowMovement) {
   .reports-day__summary > div {
     padding: 0;
     border-left: 0;
+  }
+
+  .reports-day__pending {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>
